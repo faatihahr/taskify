@@ -1,9 +1,8 @@
-
-import { Router } from "express";
-import { handleRegister, handleLogin } from "../controllers/user";
-
-const router = Router();
-
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const user_1 = require("../controllers/user");
+const router = (0, express_1.Router)();
 /**
  * @swagger
  * /api/register:
@@ -42,8 +41,7 @@ const router = Router();
  *                 user:
  *                   type: object
  */
-router.post("/register", handleRegister);
-
+router.post("/register", user_1.handleRegister);
 /**
  * @swagger
  * /api/login:
@@ -80,6 +78,5 @@ router.post("/register", handleRegister);
  *       401:
  *         description: Invalid credentials
  */
-router.post("/login", handleLogin);
-
-export default router;
+router.post("/login", user_1.handleLogin);
+exports.default = router;

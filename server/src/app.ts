@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import authRoutes from './routes/auth';
 import corsMiddleware from './middlewares/cors';
 import { errorHandler } from './middlewares/error';
+import { swaggerUi, swaggerSpec } from "./swagger/swagger";
 // import path from "path";
 
 dotenv.config();
@@ -23,7 +24,7 @@ app.use(corsMiddleware);
 // app.use("/uploads", express.static(uploadsPath));
 
 // Routes
-app.use('/api', authRoutes);
+app.use('/api', authRoutes, swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Error handling middleware
 app.use(errorHandler);
