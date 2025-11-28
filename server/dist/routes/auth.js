@@ -5,7 +5,7 @@ const user_1 = require("../controllers/user");
 const router = (0, express_1.Router)();
 /**
  * @swagger
- * /api/register:
+ * /api/auth/register:
  *   post:
  *     summary: Registrasi user
  *     tags: [Auth]
@@ -44,7 +44,7 @@ const router = (0, express_1.Router)();
 router.post("/register", user_1.handleRegister);
 /**
  * @swagger
- * /api/login:
+ * /api/auth/login:
  *   post:
  *     summary: Login user
  *     tags: [Auth]

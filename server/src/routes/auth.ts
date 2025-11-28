@@ -6,7 +6,7 @@ const router = Router();
 
 /**
  * @swagger
- * /api/register:
+ * /api/auth/register:
  *   post:
  *     summary: Registrasi user
  *     tags: [Auth]
@@ -46,7 +46,7 @@ router.post("/register", handleRegister);
 
 /**
  * @swagger
- * /api/login:
+ * /api/auth/login:
  *   post:
  *     summary: Login user
  *     tags: [Auth]

@@ -1,10 +1,11 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth';
+import boardRoutes from './routes/board';
 import corsMiddleware from './middlewares/cors';
 import { errorHandler } from './middlewares/error';
 import { swaggerUi, swaggerSpec } from "./swagger/swagger";
-// import path from "path";
+import path from "path";
 
 dotenv.config();
 
@@ -17,14 +18,14 @@ app.use(express.urlencoded({ extended: true }));
 app.use(corsMiddleware);
 
 // Serve static files from uploads
-// const uploadsPath = path.join(__dirname, "..", "uploads");
-
-// console.log("SERVING UPLOADS FROM:", uploadsPath);
-
-// app.use("/uploads", express.static(uploadsPath));
+const uploadsPath = path.join(__dirname, "..", "uploads");
+console.log("SERVING UPLOADS FROM:", uploadsPath);
+app.use("/uploads", express.static(uploadsPath));
 
 // Routes
-app.use('/api', authRoutes, swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.use('/api/auth', authRoutes);
+app.use('/api/boards', boardRoutes);
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Error handling middleware
 app.use(errorHandler);
