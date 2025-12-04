@@ -14,7 +14,9 @@ export const updateCardSchema = Joi.object({
   description: Joi.string().optional().allow('').max(1000),
   dueDate: Joi.date().optional().allow(null),
   coverImage: Joi.string().uri().optional().allow(null),
-  completed: Joi.boolean().optional()
+  completed: Joi.boolean().optional(),
+  listId: Joi.string().optional(),
+  position: Joi.number().integer().min(0).optional()
 }).min(1); // At least one field must be provided
 
 export const moveCardSchema = Joi.object({

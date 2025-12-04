@@ -1,10 +1,26 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Folder, Users, Clock, CheckCircle } from 'lucide-react';
 import { useAppSelector } from '../../store/hooks';
 import { Link } from 'react-router-dom';
+import CreateBoardModal from '../boards/CreateBoardModal';
 
 const ProjectsOverview: React.FC = () => {
   const { boards } = useAppSelector((state) => state.boards);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [showCreateModal, setShowCreateModal] = useState(false);
+
+  useEffect(() => {
+    // Open modal if URL is /boards/create
+    if (location.pathname === '/boards/create') {
+      setShowCreateModal(true);
+    }
+  }, [location.pathname]);
+
+  const handleCreateBoard = () => {
+    navigate('/boards/create');
+  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -33,7 +49,10 @@ const ProjectsOverview: React.FC = () => {
         <div className="text-center py-8 text-muted-foreground">
           <Folder className="h-12 w-12 mx-auto mb-2 opacity-50" />
           <p>No boards yet</p>
-          <button className="text-sm text-primary hover:underline mt-2 inline-block">
+          <button 
+            onClick={handleCreateBoard}
+            className="text-sm text-primary hover:underline mt-2 inline-block cursor-pointer"
+          >
             Create your first board
           </button>
         </div>
@@ -92,11 +111,23 @@ const ProjectsOverview: React.FC = () => {
       
       {boards.length > 3 && (
         <div className="text-center pt-2">
-          <Link to="/dashboard" className="text-sm text-primary hover:underline">
+          <Link to="/boards" className="text-sm text-primary hover:underline">
             View all {boards.length} boards
           </Link>
         </div>
       )}
+      
+      {/* Create Board Modal */}
+      <CreateBoardModal 
+        isOpen={showCreateModal} 
+        onClose={() => {
+          setShowCreateModal(false);
+          // Redirect to /dashboard if we're on /boards/create
+          if (location.pathname === '/boards/create') {
+            navigate('/dashboard');
+          }
+        }} 
+      />
     </div>
   );
 };

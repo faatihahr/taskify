@@ -99,7 +99,7 @@ const RecentTasks: React.FC = () => {
         ))
       )}
       <div className="text-center mt-4">
-        <Link to="/dashboard" className="text-sm text-primary hover:underline">
+        <Link to="/boards" className="text-sm text-primary hover:underline">
           View all boards
         </Link>
       </div>

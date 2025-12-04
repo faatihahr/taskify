@@ -4,6 +4,7 @@ import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import DashboardPage from './pages/DashboardPage'
 import BoardPage from './pages/BoardPage'
+import AllBoardsPage from './pages/AllBoardsPage'
 import ProtectedRoute from './components/auth/ProtectedRoute'
 import './index.css'
 
@@ -18,6 +19,22 @@ const App = () => {
         element={
           <ProtectedRoute>
             <DashboardPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/boards"
+        element={
+          <ProtectedRoute>
+            <AllBoardsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/boards/create"
+        element={
+          <ProtectedRoute>
+            <AllBoardsPage />
           </ProtectedRoute>
         }
       />

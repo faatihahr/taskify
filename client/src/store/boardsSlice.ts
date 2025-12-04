@@ -118,9 +118,17 @@ export const createList = createAsyncThunk(
 
 export const createCard = createAsyncThunk(
   'boards/createCard',
-  async ({ listId, title, description }: { listId: string; title: string; description?: string }) => {
-    const response = await api.post(`/api/lists/${listId}/cards`, { title, description })
+  async ({ listId, title, description, dueDate }: { listId: string; title: string; description?: string; dueDate?: string }) => {
+    const response = await api.post(`/api/cards`, { title, description, dueDate, listId })
     return response.data.card
+  }
+)
+
+export const moveList = createAsyncThunk(
+  'boards/moveList',
+  async ({ listId, position }: { listId: string; position: number }) => {
+    const response = await api.put(`/api/lists/${listId}`, { position })
+    return response.data.list
   }
 )
 
@@ -222,6 +230,34 @@ const boardsSlice = createSlice({
           state.currentBoard.lists.push(action.payload)
         }
       })
+      .addCase(createList.rejected, (state, action) => {
+        console.error('Create list failed:', action.error.message);
+        // Optional: Set error state to show to user
+        state.error = action.error.message || 'Failed to create list';
+      })
+      // Move list
+      .addCase(moveList.fulfilled, (state, action) => {
+        if (state.currentBoard) {
+          const movedList = action.payload;
+          const listIndex = state.currentBoard.lists.findIndex(list => list.id === movedList.id);
+          
+          if (listIndex !== -1) {
+            // Remove from old position
+            state.currentBoard.lists.splice(listIndex, 1);
+            // Insert at new position
+            state.currentBoard.lists.splice(movedList.position, 0, movedList);
+            
+            // Update positions of all lists
+            state.currentBoard.lists.forEach((list, index) => {
+              list.position = index;
+            });
+          }
+        }
+      })
+      .addCase(moveList.rejected, (state, action) => {
+        console.error('Move list failed:', action.error.message);
+        state.error = action.error.message || 'Failed to move list';
+      })
       // Create card
       .addCase(createCard.fulfilled, (state, action) => {
         if (state.currentBoard) {
@@ -231,10 +267,44 @@ const boardsSlice = createSlice({
           }
         }
       })
+      .addCase(createCard.rejected, (state, action) => {
+        console.error('Create card failed:', action.error.message);
+        state.error = action.error.message || 'Failed to create card';
+      })
       // Update card position
-      .addCase(updateCardPosition.fulfilled, () => {
-        // The optimistic update should have already handled this
-        // This is just to ensure consistency if the backend response differs
+      .addCase(updateCardPosition.pending, () => {
+        // Could add loading state here if needed
+      })
+      .addCase(updateCardPosition.fulfilled, (state, action) => {
+        // Update the card in the current board with the response from backend
+        if (state.currentBoard) {
+          const updatedCard = action.payload;
+          
+          // Find and update the card in its new position
+          for (const list of state.currentBoard.lists) {
+            const cardIndex = list.cards.findIndex(card => card.id === updatedCard.id);
+            if (cardIndex !== -1) {
+              // Remove from old list
+              list.cards.splice(cardIndex, 1);
+              break;
+            }
+          }
+          
+          // Add to new list
+          const targetList = state.currentBoard.lists.find(list => list.id === updatedCard.listId);
+          if (targetList) {
+            targetList.cards.splice(updatedCard.position, 0, updatedCard);
+            
+            // Reorder all cards in the target list to ensure correct positions
+            targetList.cards.forEach((card, index) => {
+              card.position = index;
+            });
+          }
+        }
+      })
+      .addCase(updateCardPosition.rejected, (_, action) => {
+        // Handle error - could show error notification
+        console.error('Failed to update card position:', action.error.message);
       })
   },
 })

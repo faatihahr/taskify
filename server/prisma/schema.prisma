@@ -26,6 +26,7 @@ model User {
   cards         Card[]
   comments      Comment[]
   activities    Activity[]
+  attachments   Attachment[]
 
   @@map("users")
 }
@@ -115,13 +116,19 @@ model Label {
 }
 
 model Attachment {
-  id        String   @id @default(cuid())
-  name      String
-  url       String
-  type      String   // image, document, etc
-  size      Int?     // in bytes
-  createdAt DateTime @default(now())
-
+  id          String   @id @default(cuid())
+  name        String
+  fileName    String?  // Original filename for file uploads
+  filePath    String?  // Server file path for file uploads
+  url         String?  // URL for link attachments
+  mimeType    String?  // MIME type for files
+  fileSize    Int?     // File size in bytes
+  type        String   // 'file' or 'link'
+  createdAt   DateTime @default(now())
+  
+  uploadedById String
+  uploadedBy   User    @relation(fields: [uploadedById], references: [id])
+  
   cardId String
   card   Card   @relation(fields: [cardId], references: [id], onDelete: Cascade)
 

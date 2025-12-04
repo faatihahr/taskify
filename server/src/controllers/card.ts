@@ -100,7 +100,7 @@ export const createCard = async (req: AuthenticatedRequest, res: Response) => {
       }
     });
 
-    res.status(201).json(card);
+    res.status(201).json({ card });
   } catch (error) {
     console.error('Create card error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -183,7 +183,7 @@ export const getCard = async (req: AuthenticatedRequest, res: Response) => {
 export const updateCard = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { title, description, dueDate, coverImage, completed } = req.body;
+    const { title, description, dueDate, coverImage, completed, listId, position } = req.body;
     const userId = req.user?.id;
     if (!userId) {
       return res.status(401).json({ error: 'User not authenticated' });
@@ -225,26 +225,99 @@ export const updateCard = async (req: AuthenticatedRequest, res: Response) => {
     if (coverImage !== undefined) updateData.coverImage = coverImage;
     if (completed !== undefined) updateData.completed = completed;
 
+    // Handle listId and position updates (for drag and drop)
+    if (listId !== undefined && listId !== card.listId) {
+      // Verify user has access to the target list
+      const targetList = await prisma.list.findUnique({
+        where: { id: listId },
+        include: { board: true }
+      });
+
+      if (!targetList) {
+        return res.status(404).json({ error: 'Target list not found' });
+      }
+
+      // Check if user is member of target board
+      const isTargetBoardMember = await prisma.boardMember.findUnique({
+        where: {
+          boardId_userId: {
+            boardId: targetList.board.id,
+            userId
+          }
+        }
+      });
+
+      if (!isTargetBoardMember && targetList.board.ownerId !== userId) {
+        return res.status(403).json({ error: 'Not authorized to move card to this list' });
+      }
+
+      updateData.listId = listId;
+    }
+
+    if (position !== undefined) {
+      updateData.position = position;
+    }
+
+    // If moving card to different position or list, handle reordering
+    if ((listId !== undefined && listId !== card.listId) || 
+        (position !== undefined && position !== card.position)) {
+      
+      const targetListId = listId || card.listId;
+      const targetPosition = position !== undefined ? position : card.position;
+
+      // Get all cards in the target list
+      const cardsInTargetList = await prisma.card.findMany({
+        where: { 
+          listId: targetListId,
+          id: { not: id } // Exclude current card
+        },
+        orderBy: { position: 'asc' }
+      });
+
+      // Update positions of other cards
+      await prisma.$transaction(async (tx) => {
+        // Shift cards to make space
+        for (const card of cardsInTargetList) {
+          if (card.position >= targetPosition) {
+            await tx.card.update({
+              where: { id: card.id },
+              data: { position: card.position + 1 }
+            });
+          }
+        }
+
+        // Update the current card
+        await tx.card.update({
+          where: { id },
+          data: updateData
+        });
+      });
+
+      // Fetch updated card with relationships
+      const updatedCard = await prisma.card.findUnique({
+        where: { id },
+        include: {
+          list: true,
+          creator: {
+            select: { id: true, name: true, email: true }
+          }
+        }
+      });
+
+      return res.json(updatedCard);
+    }
+
     const updatedCard = await prisma.card.update({
       where: { id },
       data: updateData,
       include: {
+        list: {
+          include: {
+            board: true
+          }
+        },
         creator: {
           select: { id: true, name: true, email: true }
-        },
-        labels: true,
-        attachments: true,
-        comments: {
-          include: {
-            user: {
-              select: { id: true, name: true, email: true }
-            }
-          }
-        },
-        checklists: {
-          include: {
-            items: true
-          }
         }
       }
     });

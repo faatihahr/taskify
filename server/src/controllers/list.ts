@@ -81,7 +81,7 @@ export const createList = async (req: AuthenticatedRequest, res: Response) => {
       }
     });
 
-    res.status(201).json(list);
+    res.status(201).json({ list });
   } catch (error) {
     console.error('Create list error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -147,15 +147,15 @@ export const getBoardLists = async (req: AuthenticatedRequest, res: Response) =>
 export const updateList = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { title } = req.body;
+    const { title, position } = req.body;
     const userId = req.user?.id;
     
     if (!userId) {
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
-    if (!title) {
-      return res.status(400).json({ error: 'Title is required' });
+    if (!title && position === undefined) {
+      return res.status(400).json({ error: 'Title or position is required' });
     }
 
     const list = await prisma.list.findUnique({
@@ -183,9 +183,50 @@ export const updateList = async (req: AuthenticatedRequest, res: Response) => {
       return res.status(403).json({ error: 'Not authorized to update this list' });
     }
 
-    const updatedList = await prisma.list.update({
+    const updateData: any = {};
+    if (title !== undefined) updateData.title = title;
+    if (position !== undefined) updateData.position = position;
+
+    // If updating position, handle reordering
+    if (position !== undefined && position !== list.position) {
+      // Get all lists in the board
+      const allLists = await prisma.list.findMany({
+        where: { 
+          boardId: list.boardId,
+          id: { not: id } // Exclude current list
+        },
+        orderBy: { position: 'asc' }
+      });
+
+      // Update positions of other lists
+      await prisma.$transaction(async (tx) => {
+        // Shift lists to make space
+        for (const otherList of allLists) {
+          if (otherList.position >= position) {
+            await tx.list.update({
+              where: { id: otherList.id },
+              data: { position: otherList.position + 1 }
+            });
+          }
+        }
+
+        // Update the current list
+        await tx.list.update({
+          where: { id },
+          data: updateData
+        });
+      });
+    } else {
+      // Simple title update
+      await prisma.list.update({
+        where: { id },
+        data: updateData
+      });
+    }
+
+    // Fetch updated list
+    const updatedList = await prisma.list.findUnique({
       where: { id },
-      data: { title },
       include: {
         cards: {
           orderBy: { position: 'asc' }
@@ -193,17 +234,7 @@ export const updateList = async (req: AuthenticatedRequest, res: Response) => {
       }
     });
 
-    // Create activity
-    await prisma.activity.create({
-      data: {
-        action: 'updated',
-        details: JSON.stringify({ field: 'title', oldValue: list.title, newValue: title }),
-        boardId: list.boardId,
-        userId
-      }
-    });
-
-    res.json(updatedList);
+    res.json({ list: updatedList });
   } catch (error) {
     console.error('Update list error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -216,6 +247,8 @@ export const moveList = async (req: AuthenticatedRequest, res: Response) => {
     const { id } = req.params;
     const { position } = req.body;
     const userId = req.user?.id;
+    
+    console.log('Move list request:', { id, position, userId });
     
     if (!userId) {
       return res.status(401).json({ error: 'User not authenticated' });
@@ -235,6 +268,8 @@ export const moveList = async (req: AuthenticatedRequest, res: Response) => {
     if (!list) {
       return res.status(404).json({ error: 'List not found' });
     }
+
+    console.log('Current list position:', list.position);
 
     // Check if user is board member
     const isMember = await prisma.boardMember.findUnique({
@@ -256,6 +291,7 @@ export const moveList = async (req: AuthenticatedRequest, res: Response) => {
     // Update positions of other lists
     if (position < currentPosition) {
       // Moving list to earlier position - shift other lists right
+      console.log('Moving list to earlier position, shifting others right');
       await prisma.list.updateMany({
         where: {
           boardId: list.boardId,
@@ -267,6 +303,7 @@ export const moveList = async (req: AuthenticatedRequest, res: Response) => {
       });
     } else if (position > currentPosition) {
       // Moving list to later position - shift other lists left
+      console.log('Moving list to later position, shifting others left');
       await prisma.list.updateMany({
         where: {
           boardId: list.boardId,
@@ -289,6 +326,8 @@ export const moveList = async (req: AuthenticatedRequest, res: Response) => {
       }
     });
 
+    console.log('Updated list position:', updatedList.position);
+
     // Create activity
     await prisma.activity.create({
       data: {
@@ -299,7 +338,7 @@ export const moveList = async (req: AuthenticatedRequest, res: Response) => {
       }
     });
 
-    res.json(updatedList);
+    res.json({ list: updatedList });
   } catch (error) {
     console.error('Move list error:', error);
     res.status(500).json({ error: 'Internal server error' });
