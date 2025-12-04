@@ -32,24 +32,28 @@ const TaskCard: React.FC<{ task: any; index: number }> = ({ task, index }) => {
           ref={provided.innerRef}
           {...provided.draggableProps}
           {...provided.dragHandleProps}
-          className={`bg-white p-4 rounded-lg border border-gray-200 cursor-pointer hover:shadow-md transition-all ${
+          className={`bg-white p-3 sm:p-4 rounded-lg border border-gray-200 cursor-pointer hover:shadow-md transition-all ${
             snapshot.isDragging ? 'shadow-xl rotate-1' : 'hover:-translate-y-1'
           }`}
         >
-          <h4 className="text-sm font-semibold text-gray-800">{task.title}</h4>
+          <h4 className="text-xs sm:text-sm font-semibold text-gray-800 line-clamp-2">
+            {task.title}
+          </h4>
           {task.description && (
-            <p className="text-xs text-gray-600 mt-2 line-clamp-2">{task.description}</p>
+            <p className="text-xs text-gray-600 mt-1 sm:mt-2 line-clamp-2 sm:line-clamp-3">
+              {task.description}
+            </p>
           )}
           
           {/* Priority indicator */}
-          <div className="flex items-center justify-between mt-3">
+          <div className="flex items-center justify-between mt-2 sm:mt-3">
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-              <span className="text-xs text-gray-500">Task</span>
+              <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-blue-500 rounded-full"></div>
+              <span className="text-xs text-gray-500 hidden sm:inline">Task</span>
             </div>
             <div className="flex items-center gap-1 text-gray-400">
-              <div className="w-1 h-3 bg-gray-300 rounded-full"></div>
-              <div className="w-1 h-3 bg-gray-300 rounded-full"></div>
+              <div className="w-0.5 h-2 sm:w-1 sm:h-3 bg-gray-300 rounded-full"></div>
+              <div className="w-0.5 h-2 sm:w-1 sm:h-3 bg-gray-300 rounded-full"></div>
             </div>
           </div>
         </div>
@@ -220,39 +224,42 @@ const BoardPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
       {/* Board Header */}
-      <div className="bg-white/90 backdrop-blur-md border-b border-purple-200 px-6 py-4 shadow-lg">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+      <div className="bg-white/90 backdrop-blur-md border-b border-purple-200 px-4 sm:px-6 py-3 sm:py-4 shadow-lg">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2 sm:gap-4">
             <Button
               variant="ghost"
               size="sm"
               onClick={handleBackToDashboard}
-              className="flex items-center gap-2 text-purple-600 hover:text-purple-800 hover:bg-purple-100"
+              className="flex items-center gap-2 text-purple-600 hover:text-purple-800 hover:bg-purple-100 p-2 sm:p-0"
             >
               <ChevronLeft className="h-4 w-4" />
-              Back
+              <span className="hidden sm:inline">Back</span>
             </Button>
-            <div>
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-lg sm:text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent truncate">
                 {currentBoard.title}
               </h1>
               {currentBoard.description && (
-                <p className="text-gray-600 text-sm mt-1">{currentBoard.description}</p>
+                <p className="text-gray-600 text-xs sm:text-sm mt-1 line-clamp-1 sm:line-clamp-none">
+                  {currentBoard.description}
+                </p>
               )}
             </div>
           </div>
           <Button 
             onClick={handleCreateList}
-            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-4 py-2 shadow-md hover:shadow-lg"
+            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-3 py-2 sm:px-4 shadow-md hover:shadow-lg w-full sm:w-auto"
           >
             <Plus className="h-4 w-4 mr-2" />
-            Add List
+            <span className="hidden sm:inline">Add List</span>
+            <span className="sm:hidden">Add</span>
           </Button>
         </div>
       </div>
 
       {/* Board Content */}
-      <div className="p-6 overflow-x-auto">
+      <div className="p-3 sm:p-6 overflow-x-auto">
         <DragDropContext onDragEnd={handleDragEnd}>
           <Droppable 
             droppableId="lists" 
@@ -263,11 +270,11 @@ const BoardPage: React.FC = () => {
               <div
                 {...provided.droppableProps}
                 ref={provided.innerRef}
-                className={`flex gap-4 min-h-[calc(100vh-200px)] transition-colors duration-200 ${
+                className={`flex gap-2 sm:gap-4 min-h-[calc(100vh-150px)] sm:min-h-[calc(100vh-200px)] transition-colors duration-200 ${
                   snapshot.isDraggingOver ? 'bg-blue-50/50' : ''
                 }`}
                 style={{
-                  minWidth: `${currentBoard.lists.length * 320 + 100}px`, // Dynamic width based on list count
+                  minWidth: `${Math.max(currentBoard.lists.length * (window.innerWidth < 640 ? 280 : 320) + 50, window.innerWidth)}px`,
                 }}
               >
                 {currentBoard.lists.map((list: any, index: number) => (
@@ -276,7 +283,7 @@ const BoardPage: React.FC = () => {
                       <div
                         ref={provided.innerRef}
                         {...provided.draggableProps}
-                        className={`w-72 ${listColors[index % listColors.length]} rounded-lg flex-shrink-0 border-2 shadow-md transition-transform ${
+                        className={`w-64 sm:w-72 ${listColors[index % listColors.length]} rounded-lg flex-shrink-0 border-2 shadow-md transition-transform ${
                           snapshot.isDragging ? 'transform rotate-2 shadow-xl' : ''
                         }`}
                         style={{
@@ -285,22 +292,24 @@ const BoardPage: React.FC = () => {
                       >
                         <div
                           {...provided.dragHandleProps}
-                          className="px-4 py-3 border-b border-white/30 cursor-move"
+                          className="px-3 sm:px-4 py-2 sm:py-3 border-b border-white/30 cursor-move"
                         >
                           <div className="flex items-center justify-between">
-                            <h3 className="font-semibold text-gray-800">{list.title}</h3>
-                            <span className="text-sm font-bold text-gray-800 bg-white/60 px-2 py-1 rounded-full shadow-sm">
+                            <h3 className="font-semibold text-gray-800 text-sm sm:text-base truncate">
+                              {list.title}
+                            </h3>
+                            <span className="text-xs sm:text-sm font-bold text-gray-800 bg-white/60 px-2 py-1 rounded-full shadow-sm flex-shrink-0">
                               {list.cards?.length || 0}
                             </span>
                           </div>
                         </div>
-                        <div className="p-3">
+                        <div className="p-2 sm:p-3">
                           <Droppable droppableId={list.id} type="CARD">
                             {(provided: any) => (
                               <div
                                 {...provided.droppableProps}
                                 ref={provided.innerRef}
-                                className="space-y-2 min-h-[200px]"
+                                className="space-y-1 sm:space-y-2 min-h-[150px] sm:min-h-[200px]"
                               >
                                 {list.cards.map((task: any, taskIndex: number) => (
                                   <TaskCard key={task.id} task={task} index={taskIndex} />
@@ -313,9 +322,9 @@ const BoardPage: React.FC = () => {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleAddTask(list.id)}
-                            className="w-full justify-start text-gray-600 hover:text-gray-800 hover:bg-white/50 mt-2"
+                            className="w-full justify-start text-gray-600 hover:text-gray-800 hover:bg-white/50 mt-1 sm:mt-2 text-xs sm:text-sm py-1 sm:py-2"
                           >
-                            <Plus className="h-4 w-4 mr-2" />
+                            <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
                             Add task
                           </Button>
                         </div>

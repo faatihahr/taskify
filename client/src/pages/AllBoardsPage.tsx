@@ -54,80 +54,87 @@ const AllBoardsPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Header />
-      <main className="flex-1 p-4 md:p-8">
-        <div className="max-w-7xl mx-auto space-y-6">
-          <div className="flex items-center justify-between">
+      <main className="flex-1 p-3 sm:p-4 md:p-6 lg:p-8">
+        <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground">
                 All Boards {loading && '(Loading...)'}
               </h1>
-              <p className="text-muted-foreground mt-1">
+              <p className="text-muted-foreground text-sm sm:text-base mt-1">
                 {boards.length} {boards.length === 1 ? 'board' : 'boards'} total
               </p>
             </div>
             {!loading && boards.length > 0 && (
-              <Button onClick={handleCreateBoard} className="flex items-center gap-2">
+              <Button onClick={handleCreateBoard} className="flex items-center gap-2 w-full sm:w-auto">
                 <Plus className="h-4 w-4" />
-                Create New Board
+                <span className="hidden sm:inline">Create New Board</span>
+                <span className="sm:hidden">Create Board</span>
               </Button>
             )}
           </div>
 
           {loading ? (
-            <div className="text-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-              <p className="text-muted-foreground mt-2">Loading boards...</p>
+            <div className="text-center py-8 sm:py-12">
+              <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-primary mx-auto"></div>
+              <p className="text-muted-foreground text-sm sm:text-base mt-2">Loading boards...</p>
             </div>
           ) : boards.length === 0 ? (
-            <div className="text-center py-12">
-              <Folder className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-              <h2 className="text-xl font-semibold mb-2">No boards yet</h2>
-              <p className="text-muted-foreground mb-4">Create your first board to get started</p>
+            <div className="text-center py-8 sm:py-12">
+              <Folder className="h-12 w-12 sm:h-16 sm:w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
+              <h2 className="text-lg sm:text-xl font-semibold mb-2">No boards yet</h2>
+              <p className="text-muted-foreground text-sm sm:text-base mb-4">Create your first board to get started</p>
               <div className="flex justify-center">
                 <Button onClick={handleCreateBoard} className="flex items-center gap-2">
                   <Plus className="h-4 w-4" />
-                  Create Your First Board
+                  <span className="hidden sm:inline">Create Your First Board</span>
+                  <span className="sm:hidden">Create Board</span>
                 </Button>
               </div>
             </div>
           ) : (
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {boards.map((board, index) => (
-                <Card key={board.id} className="p-6 hover:shadow-md transition-shadow">
-                  <div className="space-y-4">
+                <Card key={board.id} className="p-4 sm:p-6 hover:shadow-md transition-shadow">
+                  <div className="space-y-3 sm:space-y-4">
                     <div className="flex justify-between items-start">
-                      <div className="flex items-center space-x-3">
-                        <div className={`h-12 w-12 rounded-md ${getBoardColor(index)} flex items-center justify-center`}>
-                          <Folder className="h-6 w-6 text-white" />
+                      <div className="flex items-center space-x-2 sm:space-x-3">
+                        <div className={`h-10 w-10 sm:h-12 sm:w-12 rounded-md ${getBoardColor(index)} flex items-center justify-center flex-shrink-0`}>
+                          <Folder className="h-4 w-4 sm:h-6 sm:w-6 text-white" />
                         </div>
-                        <div className="flex-1">
+                        <div className="flex-1 min-w-0">
                           <Link 
                             to={`/board/${board.id}`} 
-                            className="font-medium text-lg hover:text-primary transition-colors"
+                            className="font-medium text-sm sm:text-lg hover:text-primary transition-colors block truncate"
                           >
                             {board.title}
                           </Link>
                           {board.description && (
-                            <p className="text-sm text-muted-foreground mt-1">{board.description}</p>
+                            <p className="text-xs sm:text-sm text-muted-foreground mt-1 line-clamp-2">
+                              {board.description}
+                            </p>
                           )}
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+                    <div className="flex items-center space-x-3 sm:space-x-4 text-xs sm:text-sm text-muted-foreground">
                       <span className="flex items-center">
-                        <Users className="h-4 w-4 mr-1" />
-                        {board._count?.members || 0} members
+                        <Users className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                        <span className="hidden sm:inline">{board._count?.members || 0} members</span>
+                        <span className="sm:hidden">{board._count?.members || 0}</span>
                       </span>
                       <span className="flex items-center">
-                        <CheckCircle className="h-4 w-4 mr-1" />
-                        {board._count?.lists || 0} lists
+                        <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                        <span className="hidden sm:inline">{board._count?.lists || 0} lists</span>
+                        <span className="sm:hidden">{board._count?.lists || 0}</span>
                       </span>
                     </div>
 
                     <div className="space-y-2">
                       <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>Created {daysSinceCreated(board.createdAt)} days ago</span>
+                        <span className="hidden sm:inline">Created {daysSinceCreated(board.createdAt)} days ago</span>
+                        <span className="sm:hidden">{daysSinceCreated(board.createdAt)}d ago</span>
                         <span className="flex items-center">
                           <Clock className="h-3 w-3 mr-1" />
                           {formatDate(board.updatedAt)}
@@ -147,7 +154,7 @@ const AllBoardsPage: React.FC = () => {
 
                     <div className="pt-2">
                       <Link to={`/board/${board.id}`}>
-                        <Button variant="outline" className="w-full">
+                        <Button variant="outline" className="w-full text-xs sm:text-sm py-2 sm:py-2">
                           Open Board
                         </Button>
                       </Link>
