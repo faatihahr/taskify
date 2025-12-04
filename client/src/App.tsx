@@ -3,8 +3,8 @@ import HomePage from './pages/HomePage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import DashboardPage from './pages/DashboardPage'
+import BoardPage from './pages/BoardPage'
 import ProtectedRoute from './components/auth/ProtectedRoute'
-import { useAppSelector } from './store/hooks'
 import './index.css'
 
 const App = () => {
@@ -18,6 +18,14 @@ const App = () => {
         element={
           <ProtectedRoute>
             <DashboardPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/board/:boardId"
+        element={
+          <ProtectedRoute>
+            <BoardPage />
           </ProtectedRoute>
         }
       />
