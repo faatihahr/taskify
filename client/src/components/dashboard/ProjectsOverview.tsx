@@ -33,9 +33,9 @@ const ProjectsOverview: React.FC = () => {
         <div className="text-center py-8 text-muted-foreground">
           <Folder className="h-12 w-12 mx-auto mb-2 opacity-50" />
           <p>No boards yet</p>
-          <Link to="/boards" className="text-sm text-primary hover:underline mt-2 inline-block">
+          <button className="text-sm text-primary hover:underline mt-2 inline-block">
             Create your first board
-          </Link>
+          </button>
         </div>
       ) : (
         displayedBoards.map((board, index) => (
@@ -92,7 +92,7 @@ const ProjectsOverview: React.FC = () => {
       
       {boards.length > 3 && (
         <div className="text-center pt-2">
-          <Link to="/boards" className="text-sm text-primary hover:underline">
+          <Link to="/dashboard" className="text-sm text-primary hover:underline">
             View all {boards.length} boards
           </Link>
         </div>

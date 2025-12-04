@@ -67,7 +67,7 @@ const RecentTasks: React.FC = () => {
         <div className="text-center py-8 text-muted-foreground">
           <CheckCircle className="h-12 w-12 mx-auto mb-2 opacity-50" />
           <p>No tasks yet</p>
-          <Link to="/boards" className="text-sm text-primary hover:underline mt-2 inline-block">
+          <Link to="/dashboard" className="text-sm text-primary hover:underline mt-2 inline-block">
             Create tasks in your boards
           </Link>
         </div>
@@ -99,7 +99,7 @@ const RecentTasks: React.FC = () => {
         ))
       )}
       <div className="text-center mt-4">
-        <Link to="/boards" className="text-sm text-primary hover:underline">
+        <Link to="/dashboard" className="text-sm text-primary hover:underline">
           View all boards
         </Link>
       </div>
