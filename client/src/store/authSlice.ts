@@ -1,11 +1,12 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 import type { PayloadAction } from '@reduxjs/toolkit'
-import axios from 'axios'
+import api, { setAuthToken } from '../lib/api'
 
 interface User {
   id: string
   name: string
   email: string
+  token?: string
 }
 
 interface AuthState {
@@ -24,16 +25,37 @@ const initialState: AuthState = {
 export const loginUser = createAsyncThunk(
   'auth/login',
   async (credentials: { email: string; password: string }) => {
-    const response = await axios.post('/api/auth/login', credentials)
-    return response.data
+    const response = await api.post('/api/login', credentials)
+    const data = response.data
+    // backend returns { message, user_id, name, email, token, ... }
+    // normalize to { id, name, email, token }
+    const user = {
+      id: data.user_id || data.user?.user_id || data.user?.id || data.id,
+      name: data.name || data.user?.name || (data.user && data.user.name),
+      email: data.email || data.user?.email || (data.user && data.user.email),
+      token: data.token || data.user?.token || (data.user && data.user.token),
+    }
+    // set default header immediately (will also be persisted in extraReducers)
+    if (user.token) setAuthToken(user.token)
+    return user
   }
 )
 
 export const registerUser = createAsyncThunk(
   'auth/register',
   async (userData: { name: string; email: string; password: string }) => {
-    const response = await axios.post('/api/auth/register', userData)
-    return response.data
+    const response = await api.post('/api/register', userData)
+    const data = response.data
+    // backend returns { message, user: { user_id, name, email, token } }
+    const src = data.user || data
+    const user = {
+      id: src.user_id || src.id,
+      name: src.name,
+      email: src.email,
+      token: src.token,
+    }
+    if (user.token) setAuthToken(user.token)
+    return user
   }
 )
 
@@ -44,9 +66,21 @@ const authSlice = createSlice({
     logout: (state) => {
       state.user = null
       state.error = null
+      try {
+        localStorage.removeItem('taskify_auth')
+        // clear api auth header
+        try {
+          setAuthToken(undefined)
+        } catch (e) {}
+      } catch (e) {
+        // ignore
+      }
     },
     clearError: (state) => {
       state.error = null
+    },
+    restoreSession: (state, action: PayloadAction<User | null>) => {
+      state.user = action.payload
     },
   },
   extraReducers: (builder) => {
@@ -59,6 +93,15 @@ const authSlice = createSlice({
       .addCase(loginUser.fulfilled, (state, action: PayloadAction<User>) => {
         state.loading = false
         state.user = action.payload
+        try {
+          // Persist user (including token if present)
+          localStorage.setItem('taskify_auth', JSON.stringify(action.payload))
+          if (action.payload && action.payload.token) {
+            setAuthToken(action.payload.token)
+          }
+        } catch (e) {
+          // ignore quota errors
+        }
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false
@@ -72,6 +115,14 @@ const authSlice = createSlice({
       .addCase(registerUser.fulfilled, (state, action: PayloadAction<User>) => {
         state.loading = false
         state.user = action.payload
+        try {
+          localStorage.setItem('taskify_auth', JSON.stringify(action.payload))
+          if (action.payload && action.payload.token) {
+            setAuthToken(action.payload.token)
+          }
+        } catch (e) {
+          // ignore
+        }
       })
       .addCase(registerUser.rejected, (state, action) => {
         state.loading = false
@@ -80,5 +131,5 @@ const authSlice = createSlice({
   },
 })
 
-export const { logout, clearError } = authSlice.actions
+export const { logout, clearError, restoreSession } = authSlice.actions
 export default authSlice.reducer
