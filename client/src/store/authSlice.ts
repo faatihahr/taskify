@@ -25,7 +25,7 @@ const initialState: AuthState = {
 export const loginUser = createAsyncThunk(
   'auth/login',
   async (credentials: { email: string; password: string }) => {
-    const response = await api.post('/api/login', credentials)
+    const response = await api.post('/api/auth/login', credentials)
     const data = response.data
     // backend returns { message, user_id, name, email, token, ... }
     // normalize to { id, name, email, token }
@@ -44,7 +44,7 @@ export const loginUser = createAsyncThunk(
 export const registerUser = createAsyncThunk(
   'auth/register',
   async (userData: { name: string; email: string; password: string }) => {
-    const response = await api.post('/api/register', userData)
+    const response = await api.post('/api/auth/register', userData)
     const data = response.data
     // backend returns { message, user: { user_id, name, email, token } }
     const src = data.user || data
