@@ -1,11 +1,13 @@
 import { configureStore } from '@reduxjs/toolkit'
 import authReducer from './authSlice'
+import boardsReducer from './boardsSlice'
 import { restoreSession } from './authSlice'
-import api, { setAuthToken } from '../lib/api'
+import { setAuthToken } from '../lib/api'
 
 export const store = configureStore({
   reducer: {
     auth: authReducer,
+    boards: boardsReducer,
   },
 })
 

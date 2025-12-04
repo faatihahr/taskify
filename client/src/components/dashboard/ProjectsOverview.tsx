@@ -1,50 +1,10 @@
 import React from 'react';
 import { Folder, Users, Clock, CheckCircle } from 'lucide-react';
-
-type Project = {
-  id: string;
-  name: string;
-  progress: number;
-  members: number;
-  tasks: {
-    completed: number;
-    total: number;
-  };
-  deadline: string;
-  color: string;
-};
+import { useAppSelector } from '../../store/hooks';
+import { Link } from 'react-router-dom';
 
 const ProjectsOverview: React.FC = () => {
-  // In a real app, these would come from your API/state
-  const projects: Project[] = [
-    {
-      id: '1',
-      name: 'Website Redesign',
-      progress: 75,
-      members: 5,
-      tasks: { completed: 15, total: 20 },
-      deadline: '2023-12-31',
-      color: 'bg-blue-500',
-    },
-    {
-      id: '2',
-      name: 'Mobile App Development',
-      progress: 45,
-      members: 8,
-      tasks: { completed: 9, total: 20 },
-      deadline: '2024-01-15',
-      color: 'bg-green-500',
-    },
-    {
-      id: '3',
-      name: 'Marketing Campaign',
-      progress: 30,
-      members: 3,
-      tasks: { completed: 6, total: 20 },
-      deadline: '2023-12-20',
-      color: 'bg-purple-500',
-    },
-  ];
+  const { boards } = useAppSelector((state) => state.boards);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -53,66 +13,90 @@ const ProjectsOverview: React.FC = () => {
     });
   };
 
-  const daysUntilDeadline = (deadline: string) => {
+  const daysSinceCreated = (createdDate: string) => {
     const today = new Date();
-    const deadlineDate = new Date(deadline);
-    const diffTime = deadlineDate.getTime() - today.getTime();
+    const created = new Date(createdDate);
+    const diffTime = today.getTime() - created.getTime();
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   };
 
+  const getBoardColor = (index: number) => {
+    const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500', 'bg-pink-500'];
+    return colors[index % colors.length];
+  };
+
+  const displayedBoards = boards.slice(0, 3); // Show only first 3 boards
+
   return (
     <div className="space-y-4">
-      {projects.map((project) => (
-        <div key={project.id} className="space-y-3">
-          <div className="flex justify-between items-start">
-            <div className="flex items-center space-x-3">
-              <div className={`h-10 w-10 rounded-md ${project.color} flex items-center justify-center`}>
-                <Folder className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <h3 className="font-medium">{project.name}</h3>
-                <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                  <span className="flex items-center">
-                    <Users className="h-3.5 w-3.5 mr-1" />
-                    {project.members}
-                  </span>
-                  <span>•</span>
-                  <span className="flex items-center">
-                    <CheckCircle className="h-3.5 w-3.5 mr-1" />
-                    {project.tasks.completed}/{project.tasks.total} tasks
-                  </span>
+      {displayedBoards.length === 0 ? (
+        <div className="text-center py-8 text-muted-foreground">
+          <Folder className="h-12 w-12 mx-auto mb-2 opacity-50" />
+          <p>No boards yet</p>
+          <Link to="/boards" className="text-sm text-primary hover:underline mt-2 inline-block">
+            Create your first board
+          </Link>
+        </div>
+      ) : (
+        displayedBoards.map((board, index) => (
+          <div key={board.id} className="space-y-3">
+            <div className="flex justify-between items-start">
+              <div className="flex items-center space-x-3">
+                <div className={`h-10 w-10 rounded-md ${getBoardColor(index)} flex items-center justify-center`}>
+                  <Folder className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <Link to={`/board/${board.id}`} className="font-medium hover:text-primary transition-colors">
+                    {board.title}
+                  </Link>
+                  {board.description && (
+                    <p className="text-sm text-muted-foreground mt-1">{board.description}</p>
+                  )}
+                  <div className="flex items-center space-x-2 text-sm text-muted-foreground mt-1">
+                    <span className="flex items-center">
+                      <Users className="h-3.5 w-3.5 mr-1" />
+                      {board._count?.members || 0}
+                    </span>
+                    <span>•</span>
+                    <span className="flex items-center">
+                      <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                      {board._count?.lists || 0} lists
+                    </span>
+                  </div>
                 </div>
               </div>
+              <div className="text-sm text-muted-foreground flex items-center">
+                <Clock className="h-3.5 w-3.5 mr-1" />
+                {formatDate(board.updatedAt)}
+              </div>
             </div>
-            <div className="text-sm text-muted-foreground flex items-center">
-              <Clock className="h-3.5 w-3.5 mr-1" />
-              {formatDate(project.deadline)}
+            
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Created {daysSinceCreated(board.createdAt)} days ago</span>
+                <span>Updated {daysSinceCreated(board.updatedAt)} days ago</span>
+              </div>
+              <div className="h-2 bg-muted rounded-full overflow-hidden">
+                <div 
+                  className="h-full rounded-full opacity-80" 
+                  style={{ 
+                    width: `${Math.min(100, (board._count?.lists || 0) * 20)}%`,
+                    backgroundColor: getBoardColor(index).replace('bg-', '').replace('-500', ''),
+                  }}
+                />
+              </div>
             </div>
           </div>
-          
-          <div className="space-y-1.5">
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>Progress: {project.progress}%</span>
-              <span>{daysUntilDeadline(project.deadline)} days left</span>
-            </div>
-            <div className="h-2 bg-muted rounded-full overflow-hidden">
-              <div 
-                className="h-full rounded-full" 
-                style={{ 
-                  width: `${project.progress}%`,
-                  backgroundColor: project.color.replace('bg-', 'bg-opacity-80 ')
-                }}
-              />
-            </div>
-          </div>
-        </div>
-      ))}
+        ))
+      )}
       
-      <div className="text-center pt-2">
-        <button className="text-sm text-primary hover:underline">
-          View all projects
-        </button>
-      </div>
+      {boards.length > 3 && (
+        <div className="text-center pt-2">
+          <Link to="/boards" className="text-sm text-primary hover:underline">
+            View all {boards.length} boards
+          </Link>
+        </div>
+      )}
     </div>
   );
 };

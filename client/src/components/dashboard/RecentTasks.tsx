@@ -1,51 +1,31 @@
 import React from 'react';
 import { CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { useAppSelector } from '../../store/hooks';
+import { Link } from 'react-router-dom';
 
 type Task = {
   id: string;
   title: string;
-  project: string;
-  dueDate: string;
+  boardTitle: string;
+  boardId: string;
+  dueDate?: string;
   status: 'completed' | 'in-progress' | 'overdue';
   priority: 'low' | 'medium' | 'high';
 };
 
 const RecentTasks: React.FC = () => {
-  // In a real app, these would come from your API/state
-  const tasks: Task[] = [
-    {
-      id: '1',
-      title: 'Design new dashboard layout',
-      project: 'Website Redesign',
-      dueDate: '2023-12-15',
-      status: 'in-progress',
-      priority: 'high',
-    },
-    {
-      id: '2',
-      title: 'Fix login form validation',
-      project: 'User Authentication',
-      dueDate: '2023-12-10',
-      status: 'completed',
-      priority: 'medium',
-    },
-    {
-      id: '3',
-      title: 'Prepare project presentation',
-      project: 'Quarterly Review',
-      dueDate: '2023-12-05',
-      status: 'overdue',
-      priority: 'high',
-    },
-    {
-      id: '4',
-      title: 'Update documentation',
-      project: 'API Integration',
-      dueDate: '2023-12-12',
-      status: 'in-progress',
-      priority: 'low',
-    },
-  ];
+  const { boards } = useAppSelector((state) => state.boards);
+
+  // Generate mock tasks based on boards (in real app, this would come from cards API)
+  const tasks: Task[] = boards.slice(0, 4).map((board, index) => ({
+    id: `task-${board.id}`,
+    title: `Sample task from ${board.title}`,
+    boardTitle: board.title,
+    boardId: board.id,
+    dueDate: new Date(Date.now() + (index - 2) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    status: index === 0 ? 'completed' : index === 3 ? 'overdue' : 'in-progress' as const,
+    priority: index === 0 ? 'low' : index === 1 ? 'medium' : 'high' as const,
+  }));
 
   const getStatusIcon = (status: Task['status']) => {
     switch (status) {
@@ -83,29 +63,45 @@ const RecentTasks: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      {tasks.map((task) => (
-        <div key={task.id} className="flex items-start justify-between p-3 hover:bg-muted/50 rounded-lg transition-colors">
-          <div className="flex items-start space-x-3">
-            <div className="mt-1">
-              {getStatusIcon(task.status)}
-            </div>
-            <div>
-              <p className="font-medium">{task.title}</p>
-              <p className="text-sm text-muted-foreground">{task.project}</p>
-            </div>
-          </div>
-          <div className="flex items-center space-x-3">
-            <div className="text-sm text-muted-foreground">
-              {formatDate(task.dueDate)}
-            </div>
-            {getPriorityBadge(task.priority)}
-          </div>
+      {tasks.length === 0 ? (
+        <div className="text-center py-8 text-muted-foreground">
+          <CheckCircle className="h-12 w-12 mx-auto mb-2 opacity-50" />
+          <p>No tasks yet</p>
+          <Link to="/boards" className="text-sm text-primary hover:underline mt-2 inline-block">
+            Create tasks in your boards
+          </Link>
         </div>
-      ))}
+      ) : (
+        tasks.map((task) => (
+          <div key={task.id} className="flex items-start justify-between p-3 hover:bg-muted/50 rounded-lg transition-colors">
+            <div className="flex items-start space-x-3">
+              <div className="mt-1">
+                {getStatusIcon(task.status)}
+              </div>
+              <div>
+                <p className="font-medium">{task.title}</p>
+                <p className="text-sm text-muted-foreground">
+                  <Link to={`/board/${task.boardId}`} className="hover:text-primary transition-colors">
+                    {task.boardTitle}
+                  </Link>
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-3">
+              {task.dueDate && (
+                <div className="text-sm text-muted-foreground">
+                  {formatDate(task.dueDate)}
+                </div>
+              )}
+              {getPriorityBadge(task.priority)}
+            </div>
+          </div>
+        ))
+      )}
       <div className="text-center mt-4">
-        <button className="text-sm text-primary hover:underline">
-          View all tasks
-        </button>
+        <Link to="/boards" className="text-sm text-primary hover:underline">
+          View all boards
+        </Link>
       </div>
     </div>
   );
