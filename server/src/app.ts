@@ -2,6 +2,8 @@ import express from 'express';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth';
 import boardRoutes from './routes/board';
+import cardRoutes from './routes/card';
+import listRoutes from './routes/list';
 import corsMiddleware from './middlewares/cors';
 import { errorHandler } from './middlewares/error';
 import { swaggerUi, swaggerSpec } from "./swagger/swagger";
@@ -25,6 +27,8 @@ app.use("/uploads", express.static(uploadsPath));
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/boards', boardRoutes);
+app.use('/api/cards', cardRoutes);
+app.use('/api', listRoutes);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Error handling middleware
