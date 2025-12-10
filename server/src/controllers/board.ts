@@ -170,7 +170,18 @@ export async function getBoardById(req: Request, res: Response) {
               orderBy: {
                 position: 'asc'
               },
-              include: {
+              select: {
+                id: true,
+                title: true,
+                description: true,
+                position: true,
+                coverImage: true,
+                dueDate: true,
+                completed: true,
+                createdAt: true,
+                updatedAt: true,
+                listId: true,
+                creatorId: true,
                 creator: {
                   select: {
                     id: true,

@@ -11,7 +11,9 @@ import {
   getCard,
   updateCard,
   moveCard,
-  deleteCard
+  deleteCard,
+  uploadCoverImage,
+  coverUploadMiddleware
 } from '../controllers/card';
 
 const router = Router();
@@ -472,6 +474,77 @@ router.put('/:id/move', validate(moveCardSchema), moveCard);
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
+/**
+ * @swagger
+ * /api/cards/{id}/cover:
+ *   post:
+ *     summary: Upload a cover image for a card
+ *     tags: [Cards]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Card ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *                 description: Image file to upload as cover image
+ *             required:
+ *               - file
+ *     responses:
+ *       200:
+ *         description: Cover image uploaded successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 card:
+ *                   $ref: '#/components/schemas/Card'
+ *       400:
+ *         description: No file uploaded or invalid file type
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: User not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       403:
+ *         description: Not authorized to update this card
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Card not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.post('/:id/cover', coverUploadMiddleware, uploadCoverImage);
+
 router.delete('/:id', deleteCard);
 
 export default router;

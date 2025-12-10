@@ -5,9 +5,10 @@ import type { DropResult } from '@hello-pangea/dnd';
 import { Button } from '../components/ui/button';
 import { Plus, ChevronLeft } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { fetchBoardById, reorderCards, updateCardPosition, moveList } from '../store/boardsSlice';
+import { fetchBoardById, reorderCards, updateCardPosition, moveList, updateTaskCoverImage } from '../store/boardsSlice';
 import CreateListModal from '../components/lists/CreateListModal';
 import CreateCardModal from '../components/cards/CreateCardModal';
+import TaskDetailModal from '../components/cards/TaskDetailModal';
 import { useNavigate } from 'react-router-dom';
 
 // Color palette for lists
@@ -22,7 +23,7 @@ const listColors = [
   'bg-orange-100 border-orange-300',
 ];
 
-const TaskCard: React.FC<{ task: any; index: number }> = ({ task, index }) => {
+const TaskCard: React.FC<{ task: any; index: number; onClick: () => void }> = ({ task, index, onClick }) => {
   console.log('TaskCard rendered:', { taskId: task.id, taskTitle: task.title, index });
   
   return (
@@ -32,28 +33,52 @@ const TaskCard: React.FC<{ task: any; index: number }> = ({ task, index }) => {
           ref={provided.innerRef}
           {...provided.draggableProps}
           {...provided.dragHandleProps}
-          className={`bg-white p-3 sm:p-4 rounded-lg border border-gray-200 cursor-pointer hover:shadow-md transition-all ${
+          onClick={onClick}
+          className={`bg-white rounded-lg border border-gray-200 cursor-pointer hover:shadow-md transition-all overflow-hidden ${
             snapshot.isDragging ? 'shadow-xl rotate-1' : 'hover:-translate-y-1'
           }`}
         >
-          <h4 className="text-xs sm:text-sm font-semibold text-gray-800 line-clamp-2">
-            {task.title}
-          </h4>
-          {task.description && (
-            <p className="text-xs text-gray-600 mt-1 sm:mt-2 line-clamp-2 sm:line-clamp-3">
-              {task.description}
-            </p>
+          {/* Cover Image */}
+          {(() => {
+            console.log('Task coverImage:', task.coverImage);
+            const imageUrl = task.coverImage?.startsWith('/uploads') ? `http://localhost:3000${task.coverImage}` : task.coverImage;
+            console.log('Final image URL:', imageUrl);
+            return task.coverImage;
+          })() && (
+            <div className="w-full h-24 overflow-hidden border-2 border-red-500">
+              <img 
+                src={task.coverImage?.startsWith('/uploads') ? `http://localhost:3000${task.coverImage}` : task.coverImage} 
+                alt={task.title}
+                className="w-full h-full object-cover"
+                onLoad={() => console.log('Image loaded successfully:', task.coverImage)}
+                onError={(e) => {
+                  console.error('Image load error:', e);
+                  console.error('Image src:', task.coverImage);
+                }}
+              />
+            </div>
           )}
           
-          {/* Priority indicator */}
-          <div className="flex items-center justify-between mt-2 sm:mt-3">
-            <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-blue-500 rounded-full"></div>
-              <span className="text-xs text-gray-500 hidden sm:inline">Task</span>
-            </div>
-            <div className="flex items-center gap-1 text-gray-400">
-              <div className="w-0.5 h-2 sm:w-1 sm:h-3 bg-gray-300 rounded-full"></div>
-              <div className="w-0.5 h-2 sm:w-1 sm:h-3 bg-gray-300 rounded-full"></div>
+          <div className="p-3 sm:p-4">
+            <h4 className="text-xs sm:text-sm font-semibold text-gray-800 line-clamp-2">
+              {task.title}
+            </h4>
+            {task.description && (
+              <p className="text-xs text-gray-600 mt-1 sm:mt-2 line-clamp-2 sm:line-clamp-3">
+                {task.description}
+              </p>
+            )}
+            
+            {/* Priority indicator */}
+            <div className="flex items-center justify-between mt-2 sm:mt-3">
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-blue-500 rounded-full"></div>
+                <span className="text-xs text-gray-500 hidden sm:inline">Task</span>
+              </div>
+              <div className="flex items-center gap-1 text-gray-400">
+                <div className="w-0.5 h-2 sm:w-1 sm:h-3 bg-gray-300 rounded-full"></div>
+                <div className="w-0.5 h-2 sm:w-1 sm:h-3 bg-gray-300 rounded-full"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -69,6 +94,8 @@ const BoardPage: React.FC = () => {
   const { currentBoard, currentBoardLoading, error } = useAppSelector((state) => state.boards);
   const [showCreateListModal, setShowCreateListModal] = useState(false);
   const [showCreateCardModal, setShowCreateCardModal] = useState(false);
+  const [showTaskDetailModal, setShowTaskDetailModal] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<any>(null);
   const [selectedListId, setSelectedListId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -84,6 +111,30 @@ const BoardPage: React.FC = () => {
   const handleAddTask = (listId: string) => {
     setSelectedListId(listId);
     setShowCreateCardModal(true);
+  };
+
+  const handleTaskClick = (task: any) => {
+    setSelectedTask(task);
+    setShowTaskDetailModal(true);
+  };
+
+  const handleCoverImageUpdate = async (taskId: string, newCoverImage: string) => {
+    console.log('handleCoverImageUpdate in BoardPage:', { taskId, newCoverImage });
+    
+    try {
+      // Dispatch action to update task cover image in Redux store
+      await dispatch(updateTaskCoverImage({ taskId, coverImage: newCoverImage })).unwrap();
+      console.log('Task cover image updated successfully in Redux store');
+      
+      // Update selectedTask for immediate UI update
+      if (selectedTask && selectedTask.id === taskId) {
+        const updatedTask = { ...selectedTask, coverImage: newCoverImage };
+        setSelectedTask(updatedTask);
+        console.log('selectedTask updated:', updatedTask);
+      }
+    } catch (error) {
+      console.error('Failed to update task cover image:', error);
+    }
   };
 
   const handleBackToDashboard = () => {
@@ -312,7 +363,12 @@ const BoardPage: React.FC = () => {
                                 className="space-y-1 sm:space-y-2 min-h-[150px] sm:min-h-[200px]"
                               >
                                 {list.cards.map((task: any, taskIndex: number) => (
-                                  <TaskCard key={task.id} task={task} index={taskIndex} />
+                                  <TaskCard 
+                                    key={task.id} 
+                                    task={task} 
+                                    index={taskIndex} 
+                                    onClick={() => handleTaskClick(task)}
+                                  />
                                 ))}
                                 {provided.placeholder}
                               </div>
@@ -355,6 +411,18 @@ const BoardPage: React.FC = () => {
           onClose={() => {
             setShowCreateCardModal(false);
             setSelectedListId(null);
+          }}
+        />
+      )}
+
+      {showTaskDetailModal && selectedTask && (
+        <TaskDetailModal
+          task={selectedTask}
+          isOpen={showTaskDetailModal}
+          onCoverImageUpdate={handleCoverImageUpdate}
+          onClose={() => {
+            setShowTaskDetailModal(false);
+            setSelectedTask(null);
           }}
         />
       )}

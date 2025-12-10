@@ -140,6 +140,22 @@ export const updateCardPosition = createAsyncThunk(
   }
 )
 
+export const updateTaskCoverImage = createAsyncThunk(
+  'boards/updateTaskCoverImage',
+  async ({ taskId, coverImage }: { taskId: string; coverImage: string }) => {
+    const response = await api.put(`/api/cards/${taskId}`, { coverImage })
+    console.log('API response for updateTaskCoverImage:', response.data);
+    console.log('Response structure:', JSON.stringify(response.data, null, 2));
+    
+    // The backend returns the updated card directly, not wrapped in response.data.card
+    if (response.data) {
+      return response.data;
+    } else {
+      throw new Error('No data returned from API');
+    }
+  }
+)
+
 const boardsSlice = createSlice({
   name: 'boards',
   initialState,
@@ -305,6 +321,29 @@ const boardsSlice = createSlice({
       .addCase(updateCardPosition.rejected, (_, action) => {
         // Handle error - could show error notification
         console.error('Failed to update card position:', action.error.message);
+      })
+      // Update task cover image
+      .addCase(updateTaskCoverImage.fulfilled, (state, action) => {
+        console.log('updateTaskCoverImage.fulfilled payload:', action.payload);
+        
+        if (state.currentBoard && action.payload) {
+          const updatedCard = action.payload;
+          
+          // Find and update the card in the current board
+          for (const list of state.currentBoard.lists) {
+            const cardIndex = list.cards.findIndex(card => card.id === updatedCard.id);
+            if (cardIndex !== -1) {
+              list.cards[cardIndex] = updatedCard;
+              console.log('Card updated in Redux store:', updatedCard);
+              break;
+            }
+          }
+        } else {
+          console.error('updateTaskCoverImage: No payload or currentBoard');
+        }
+      })
+      .addCase(updateTaskCoverImage.rejected, (_, action) => {
+        console.error('Failed to update task cover image:', action.error.message);
       })
   },
 })

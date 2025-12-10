@@ -1,5 +1,8 @@
 import { Request, Response } from 'express';
 import { prisma } from '../prisma/client';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
 import { 
   createCardSchema, 
   updateCardSchema, 
@@ -13,7 +16,45 @@ interface AuthenticatedRequest extends Request {
     email: string;
     name?: string;
   };
+  file?: Express.Multer.File;
 }
+
+// Configure multer for cover image uploads
+const coverStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadsDir = path.join(process.cwd(), 'uploads', 'covers');
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+    cb(null, uploadsDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    cb(null, `cover-${uniqueSuffix}${ext}`);
+  }
+});
+
+const coverUpload = multer({
+  storage: coverStorage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit for cover images
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = [
+      'image/jpeg',
+      'image/png', 
+      'image/gif',
+      'image/webp'
+    ];
+    
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only JPEG, PNG, GIF, and WebP images are allowed for cover images.'));
+    }
+  }
+});
 
 // Create a new card
 export const createCard = async (req: AuthenticatedRequest, res: Response) => {
@@ -71,6 +112,11 @@ export const createCard = async (req: AuthenticatedRequest, res: Response) => {
       include: {
         creator: {
           select: { id: true, name: true, email: true }
+        },
+        list: {
+          include: {
+            board: true
+          }
         },
         labels: true,
         attachments: true,
@@ -577,3 +623,105 @@ export const deleteCard = async (req: AuthenticatedRequest, res: Response) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+// Upload cover image for card
+export const uploadCoverImage = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.id;
+    const uploadedFile = req.file;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    if (!uploadedFile) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    // Verify card exists and user has access
+    const card = await prisma.card.findUnique({
+      where: { id },
+      include: {
+        list: {
+          include: {
+            board: true
+          }
+        }
+      }
+    });
+
+    if (!card) {
+      return res.status(404).json({ error: 'Card not found' });
+    }
+
+    // Check if user is board member
+    const isMember = await prisma.boardMember.findUnique({
+      where: {
+        boardId_userId: {
+          boardId: card.list.board.id,
+          userId
+        }
+      }
+    });
+
+    if (!isMember && card.list.board.ownerId !== userId) {
+      return res.status(403).json({ error: 'Not authorized to update this card' });
+    }
+
+    // Delete old cover image if exists
+    if (card.coverImage) {
+      const oldCoverPath = path.join(process.cwd(), 'uploads', 'covers', path.basename(card.coverImage));
+      if (fs.existsSync(oldCoverPath)) {
+        fs.unlinkSync(oldCoverPath);
+      }
+    }
+
+    // Update card with new cover image URL
+    const coverImageUrl = `/uploads/covers/${uploadedFile.filename}`;
+    
+    const updatedCard = await prisma.card.update({
+      where: { id },
+      data: { coverImage: coverImageUrl },
+      include: {
+        creator: {
+          select: { id: true, name: true, email: true }
+        },
+        list: true,
+        labels: true,
+        attachments: true,
+        comments: {
+          include: {
+            user: {
+              select: { id: true, name: true, email: true }
+            }
+          }
+        },
+        checklists: {
+          include: {
+            items: true
+          }
+        }
+      }
+    });
+
+    // Create activity
+    await prisma.activity.create({
+      data: {
+        action: 'cover_image_updated',
+        details: JSON.stringify({ fileName: uploadedFile.originalname }),
+        boardId: card.list.board.id,
+        cardId: card.id,
+        userId
+      }
+    });
+
+    res.json({ card: updatedCard });
+  } catch (error) {
+    console.error('Upload cover image error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Export the upload middleware
+export const coverUploadMiddleware = coverUpload.single('file');

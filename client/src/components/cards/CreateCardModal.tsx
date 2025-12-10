@@ -3,10 +3,11 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { X, Plus, Calendar, Users, Tag, Paperclip } from 'lucide-react';
+import { X, Plus, Calendar, Users, Tag, Paperclip, Image } from 'lucide-react';
 import { useAppDispatch } from '../../store/hooks';
-import { createCard } from '../../store/boardsSlice';
+import { createCard, updateTaskCoverImage } from '../../store/boardsSlice';
 import { uploadAttachment, addLinkAttachment } from '../../services/attachmentService';
+import api from '../../lib/api';
 
 interface CreateCardModalProps {
   isOpen: boolean;
@@ -24,7 +25,10 @@ const CreateCardModal: React.FC<CreateCardModalProps> = ({ isOpen, onClose, list
   const [attachments, setAttachments] = useState<File[]>([]);
   const [linkUrl, setLinkUrl] = useState('');
   const [linkName, setLinkName] = useState('');
+  const [coverImage, setCoverImage] = useState<File | null>(null);
+  const [coverImagePreview, setCoverImagePreview] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const coverImageInputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,26 +49,35 @@ const CreateCardModal: React.FC<CreateCardModalProps> = ({ isOpen, onClose, list
         console.log('Card created successfully:', result.payload);
         const createdCard = result.payload;
         
-        // Upload file attachments
-        if (attachments.length > 0) {
-          try {
+        try {
+          // Upload cover image if provided
+          if (coverImage) {
+            const coverImageUrl = await uploadCoverImageToCard(createdCard.id, coverImage);
+            console.log('Cover image uploaded successfully:', coverImageUrl);
+            
+            // Update Redux store with the cover image
+            await dispatch(updateTaskCoverImage({ 
+              taskId: createdCard.id, 
+              coverImage: coverImageUrl 
+            })).unwrap();
+            console.log('Redux store updated with cover image');
+          }
+          
+          // Upload file attachments
+          if (attachments.length > 0) {
             for (const file of attachments) {
               await uploadAttachment(createdCard.id, file);
             }
             console.log('All attachments uploaded successfully');
-          } catch (attachmentError) {
-            console.error('Failed to upload attachments:', attachmentError);
           }
-        }
-        
-        // Add link attachment if provided
-        if (linkName.trim() && linkUrl.trim()) {
-          try {
+          
+          // Add link attachment if provided
+          if (linkName.trim() && linkUrl.trim()) {
             await addLinkAttachment(createdCard.id, linkName, linkUrl);
             console.log('Link attachment added successfully');
-          } catch (linkError) {
-            console.error('Failed to add link attachment:', linkError);
           }
+        } catch (error) {
+          console.error('Failed to upload some files:', error);
         }
         
         onClose();
@@ -74,6 +87,7 @@ const CreateCardModal: React.FC<CreateCardModalProps> = ({ isOpen, onClose, list
         setAttachments([]);
         setLinkUrl('');
         setLinkName('');
+        handleRemoveCoverImage();
         setShowAdvanced(false);
       } else {
         console.error('Create card failed:', result.error);
@@ -103,6 +117,52 @@ const CreateCardModal: React.FC<CreateCardModalProps> = ({ isOpen, onClose, list
     }
   };
 
+  const handleCoverImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+      if (!allowedTypes.includes(file.type)) {
+        alert('Invalid file type. Please select a JPEG, PNG, GIF, or WebP image.');
+        return;
+      }
+
+      // Validate file size (5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('File size too large. Please select an image smaller than 5MB.');
+        return;
+      }
+
+      setCoverImage(file);
+      const preview = URL.createObjectURL(file);
+      setCoverImagePreview(preview);
+    }
+  };
+
+  const handleRemoveCoverImage = () => {
+    setCoverImage(null);
+    if (coverImagePreview) {
+      URL.revokeObjectURL(coverImagePreview);
+      setCoverImagePreview('');
+    }
+    if (coverImageInputRef.current) {
+      coverImageInputRef.current.value = '';
+    }
+  };
+
+  const uploadCoverImageToCard = async (cardId: string, file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await api.post(`/api/cards/${cardId}/cover`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
+    return response.data.card.coverImage;
+  };
+
   const handleClose = () => {
     if (!isLoading) {
       onClose();
@@ -113,6 +173,7 @@ const CreateCardModal: React.FC<CreateCardModalProps> = ({ isOpen, onClose, list
       setAttachments([]);
       setLinkUrl('');
       setLinkName('');
+      handleRemoveCoverImage();
     }
   };
 
@@ -152,6 +213,55 @@ const CreateCardModal: React.FC<CreateCardModalProps> = ({ isOpen, onClose, list
                 className="resize-none"
                 autoFocus
               />
+            </div>
+
+            {/* Cover Image Section */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Cover Image</Label>
+              <div className="space-y-2">
+                {coverImagePreview ? (
+                  <div className="relative">
+                    <img 
+                      src={coverImagePreview} 
+                      alt="Cover preview" 
+                      className="w-full h-32 object-cover rounded-lg border"
+                    />
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      onClick={handleRemoveCoverImage}
+                      disabled={isLoading}
+                      className="absolute top-2 right-2 h-6 w-6 p-0"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
+                    <input
+                      ref={coverImageInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/gif,image/webp"
+                      onChange={handleCoverImageSelect}
+                      className="hidden"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => coverImageInputRef.current?.click()}
+                      disabled={isLoading}
+                      className="text-gray-600 hover:text-gray-800"
+                    >
+                      <Image className="h-4 w-4 mr-2" />
+                      Add Cover Image
+                    </Button>
+                    <p className="text-xs text-gray-500 mt-1">
+                      JPEG, PNG, GIF, WebP (max 5MB)
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
             
             {/* Description Section */}
