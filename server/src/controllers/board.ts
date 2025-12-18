@@ -202,6 +202,14 @@ export async function getBoardById(req: Request, res: Response) {
                     createdAt: 'desc'
                   }
                 },
+                checklists: {
+                  include: {
+                    items: {
+                      orderBy: { position: 'asc' }
+                    }
+                  },
+                  orderBy: { position: 'asc' }
+                },
                 _count: {
                   select: {
                     comments: true,

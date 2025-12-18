@@ -13,7 +13,13 @@ import {
   moveCard,
   deleteCard,
   uploadCoverImage,
-  coverUploadMiddleware
+  coverUploadMiddleware,
+  createComment,
+  createChecklist,
+  createChecklistItem,
+  updateChecklistItem,
+  deleteChecklist,
+  deleteChecklistItem
 } from '../controllers/card';
 
 const router = Router();
@@ -544,6 +550,91 @@ router.put('/:id/move', validate(moveCardSchema), moveCard);
  *               $ref: '#/components/schemas/Error'
  */
 router.post('/:id/cover', coverUploadMiddleware, uploadCoverImage);
+
+/**
+ * @swagger
+ * /api/cards/{id}/comments:
+ *   post:
+ *     summary: Create a comment on a card
+ *     tags: [Cards]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Card ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - content
+ *             properties:
+ *               content:
+ *                 type: string
+ *                 minLength: 1
+ *                 maxLength: 1000
+ *                 example: "This is a comment"
+ *     responses:
+ *       201:
+ *         description: Comment created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 comment:
+ *                   $ref: '#/components/schemas/Comment'
+ *       400:
+ *         description: Validation error or bad request
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: User not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       403:
+ *         description: Not authorized to comment on this card
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Card not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.post('/:id/comments', createComment);
+
+// Checklist routes
+router.post('/:id/checklists', createChecklist);
+router.post('/checklists/:checklistId/items', createChecklistItem);
+router.put('/checklists/items/:itemId', updateChecklistItem);
+router.delete('/checklists/:checklistId', deleteChecklist);
+router.delete('/checklists/items/:itemId', deleteChecklistItem);
+
+// Test endpoint for debugging
+router.post('/:id/comments/test', (req, res) => {
+  console.log('Test comment endpoint hit');
+  res.json({ message: 'Test endpoint working', params: req.params, body: req.body });
+});
 
 router.delete('/:id', deleteCard);
 

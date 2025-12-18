@@ -231,6 +231,12 @@ export const updateCard = async (req: AuthenticatedRequest, res: Response) => {
     const { id } = req.params;
     const { title, description, dueDate, coverImage, completed, listId, position } = req.body;
     const userId = req.user?.id;
+    
+    console.log('=== UPDATE CARD DEBUG ===');
+    console.log('Card ID:', id);
+    console.log('Request body:', { title, description, dueDate, coverImage, completed, listId, position });
+    console.log('User ID:', userId);
+    
     if (!userId) {
       return res.status(401).json({ error: 'User not authenticated' });
     }
@@ -310,32 +316,170 @@ export const updateCard = async (req: AuthenticatedRequest, res: Response) => {
       
       const targetListId = listId || card.listId;
       const targetPosition = position !== undefined ? position : card.position;
+      const isMovingToSameList = targetListId === card.listId;
+      const currentPosition = card.position;
+      
+      console.log('REORDERING DEBUG:');
+      console.log('Current position:', currentPosition);
+      console.log('Target position:', targetPosition);
+      console.log('Target list ID:', targetListId);
+      console.log('Is same list:', isMovingToSameList);
 
-      // Get all cards in the target list
-      const cardsInTargetList = await prisma.card.findMany({
+      // Get all cards in the target list (including current card if same list)
+      const allCardsInTargetList = await prisma.card.findMany({
         where: { 
-          listId: targetListId,
-          id: { not: id } // Exclude current card
+          listId: targetListId
         },
         orderBy: { position: 'asc' }
       });
+      
+      console.log('Cards in target list before update:', allCardsInTargetList.map(c => ({ id: c.id, position: c.position })));
 
       // Update positions of other cards
       await prisma.$transaction(async (tx) => {
-        // Shift cards to make space
-        for (const card of cardsInTargetList) {
-          if (card.position >= targetPosition) {
-            await tx.card.update({
-              where: { id: card.id },
-              data: { position: card.position + 1 }
-            });
+        if (isMovingToSameList) {
+          // Moving within same list - need to handle UI index vs database position
+          console.log('Moving within same list - handling UI index conversion');
+          
+          // Sort cards by position to ensure correct order
+          const sortedCards = allCardsInTargetList.sort((a, b) => a.position - b.position);
+          
+          // Find the actual database positions
+          let actualCurrentPosition = currentPosition;
+          let actualTargetPosition = targetPosition;
+          
+          // Find current card's position in sorted array
+          const currentCardIndex = sortedCards.findIndex(card => card.id === id);
+          if (currentCardIndex !== -1) {
+            actualCurrentPosition = sortedCards[currentCardIndex].position;
           }
+          
+          // Calculate target position based on UI index
+          if (targetPosition === 0) {
+            actualTargetPosition = 0;
+          } else if (targetPosition >= sortedCards.length) {
+            const lastCard = sortedCards[sortedCards.length - 1];
+            actualTargetPosition = lastCard ? lastCard.position + 1 : 0;
+          } else {
+            const cardAtTargetIndex = sortedCards[targetPosition];
+            if (cardAtTargetIndex) {
+              actualTargetPosition = cardAtTargetIndex.position;
+            }
+          }
+          
+          console.log('Same list movement - Current:', actualCurrentPosition, '-> Target:', actualTargetPosition);
+          
+          if (actualTargetPosition < actualCurrentPosition) {
+            // Moving up: shift cards down between target and current position
+            for (const card of sortedCards) {
+              if (card.position >= actualTargetPosition && card.position < actualCurrentPosition && card.id !== id) {
+                console.log('Shifting card down:', card.id, 'from', card.position, 'to', card.position + 1);
+                await tx.card.update({
+                  where: { id: card.id },
+                  data: { position: card.position + 1 }
+                });
+              }
+            }
+          } else if (actualTargetPosition > actualCurrentPosition) {
+            // Moving down: shift cards up between current and target position
+            for (const card of sortedCards) {
+              if (card.position > actualCurrentPosition && card.position <= actualTargetPosition && card.id !== id) {
+                console.log('Shifting card up:', card.id, 'from', card.position, 'to', card.position - 1);
+                await tx.card.update({
+                  where: { id: card.id },
+                  data: { position: card.position - 1 }
+                });
+              }
+            }
+          }
+          
+          // Update the current card with the actual position
+          console.log('Updating current card within same list:', id, 'to position:', actualTargetPosition);
+          await tx.card.update({
+            where: { id },
+            data: { ...updateData, position: actualTargetPosition }
+          });
+          
+          return; // Skip the final update since we already updated in transaction
+        } else {
+          // Moving to different list
+          console.log('Moving to different list - calculating correct position');
+          
+          // For moving to different list, we need to calculate the actual database position
+          // The targetPosition from frontend is the UI index, not database position
+          // We need to find the correct database position based on existing cards
+          
+          let actualTargetPosition = targetPosition;
+          
+          // Sort cards by position to ensure correct order
+          const sortedTargetList = allCardsInTargetList.sort((a, b) => a.position - b.position);
+          
+          console.log('Sorted target list by position:', sortedTargetList.map(c => ({ id: c.id, position: c.position })));
+          
+          // Find the correct database position based on UI index
+          if (targetPosition === 0) {
+            // Inserting at the beginning, position should be 0
+            actualTargetPosition = 0;
+          } else if (targetPosition >= sortedTargetList.length) {
+            // Inserting at the end, position should be last card's position + 1
+            const lastCard = sortedTargetList[sortedTargetList.length - 1];
+            actualTargetPosition = lastCard ? lastCard.position + 1 : 0;
+          } else {
+            // Inserting in the middle, find the card at this position
+            const cardAtTargetPosition = sortedTargetList[targetPosition];
+            if (cardAtTargetPosition) {
+              actualTargetPosition = cardAtTargetPosition.position;
+            }
+          }
+          
+          console.log('UI target position:', targetPosition, '-> Actual database position:', actualTargetPosition);
+          
+          // Shift cards in target list to make space at the actual position
+          for (const card of allCardsInTargetList) {
+            if (card.position >= actualTargetPosition) {
+              console.log('Shifting target list card:', card.id, 'from', card.position, 'to', card.position + 1);
+              await tx.card.update({
+                where: { id: card.id },
+                data: { position: card.position + 1 }
+              });
+            }
+          }
+          
+          // Shift cards in source list to fill the gap
+          const sourceListCards = await prisma.card.findMany({
+            where: { 
+              listId: card.listId,
+              id: { not: id }
+            },
+            orderBy: { position: 'asc' }
+          });
+          
+          console.log('Filling gap in source list, current position:', currentPosition);
+          for (const sourceCard of sourceListCards) {
+            if (sourceCard.position > currentPosition) {
+              console.log('Shifting source list card:', sourceCard.id, 'from', sourceCard.position, 'to', sourceCard.position - 1);
+              await tx.card.update({
+                where: { id: sourceCard.id },
+                data: { position: sourceCard.position - 1 }
+              });
+            }
+          }
+          
+          // Update the current card with the actual position
+          console.log('Updating current card:', id, 'to actual position:', actualTargetPosition);
+          await tx.card.update({
+            where: { id },
+            data: { ...updateData, position: actualTargetPosition }
+          });
+          
+          return; // Skip the final update since we already updated in transaction
         }
 
         // Update the current card
+        console.log('Updating current card:', id, 'to position:', targetPosition);
         await tx.card.update({
           where: { id },
-          data: updateData
+          data: { ...updateData, position: targetPosition }
         });
       });
 
@@ -353,6 +497,7 @@ export const updateCard = async (req: AuthenticatedRequest, res: Response) => {
       return res.json(updatedCard);
     }
 
+    // For non-position updates, use the regular update logic
     const updatedCard = await prisma.card.update({
       where: { id },
       data: updateData,
@@ -723,5 +868,418 @@ export const uploadCoverImage = async (req: AuthenticatedRequest, res: Response)
   }
 };
 
+export const createComment = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id: cardId } = req.params;
+    const { content } = req.body;
+    const userId = req.user?.id;
+
+    console.log('Create comment request:', { cardId, content: content?.substring(0, 50), userId });
+
+    if (!userId) {
+      console.log('No user ID found');
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    if (!content || content.trim().length === 0) {
+      console.log('No content provided');
+      return res.status(400).json({ error: 'Comment content is required' });
+    }
+
+    console.log('Looking for card:', cardId);
+
+    // Check if card exists and user has access
+    const card = await prisma.card.findUnique({
+      where: { id: cardId },
+      include: {
+        list: {
+          include: {
+            board: {
+              include: {
+                members: {
+                  where: { userId }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    console.log('Card found:', card ? 'Yes' : 'No');
+
+    if (!card) {
+      return res.status(404).json({ error: 'Card not found' });
+    }
+
+    // Check if user is board owner or member
+    const isOwner = card.list.board.ownerId === userId;
+    const isMember = card.list.board.members.length > 0;
+
+    console.log('User access check:', { isOwner, isMember, userId, ownerId: card.list.board.ownerId });
+
+    if (!isOwner && !isMember) {
+      return res.status(403).json({ error: 'Not authorized to comment on this card' });
+    }
+
+    console.log('Creating comment...');
+
+    // Create comment
+    const comment = await prisma.comment.create({
+      data: {
+        content: content.trim(),
+        cardId,
+        userId
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
+      }
+    });
+
+    console.log('Comment created successfully:', comment);
+
+    // Create activity (optional - wrap in try-catch to avoid blocking comment creation)
+    try {
+      await prisma.activity.create({
+        data: {
+          action: 'commented',
+          details: JSON.stringify({ commentId: comment.id }),
+          boardId: card.list.board.id,
+          cardId: card.id,
+          userId
+        }
+      });
+      console.log('Activity created successfully');
+    } catch (activityError) {
+      console.error('Failed to create activity (but comment was saved):', activityError);
+      // Don't fail the entire request if activity creation fails
+    }
+
+    res.status(201).json({ comment });
+  } catch (error) {
+    console.error('Create comment error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 // Export the upload middleware
 export const coverUploadMiddleware = coverUpload.single('file');
+
+// Checklist controllers
+export const createChecklist = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id: cardId } = req.params;
+    const { title } = req.body;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    if (!title || title.trim().length === 0) {
+      return res.status(400).json({ error: 'Checklist title is required' });
+    }
+
+    // Check if card exists and user has access
+    const card = await prisma.card.findUnique({
+      where: { id: cardId },
+      include: {
+        list: {
+          include: {
+            board: {
+              include: {
+                members: {
+                  where: { userId }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!card) {
+      return res.status(404).json({ error: 'Card not found' });
+    }
+
+    const isOwner = card.list.board.ownerId === userId;
+    const isMember = card.list.board.members.length > 0;
+
+    if (!isOwner && !isMember) {
+      return res.status(403).json({ error: 'Not authorized to add checklist to this card' });
+    }
+
+    // Get the next position for this checklist
+    const maxPosition = await prisma.checklist.findFirst({
+      where: { cardId },
+      orderBy: { position: 'desc' }
+    });
+    const position = maxPosition ? maxPosition.position + 1 : 0;
+
+    const checklist = await prisma.checklist.create({
+      data: {
+        title: title.trim(),
+        cardId,
+        position
+      },
+      include: {
+        items: {
+          orderBy: { position: 'asc' }
+        }
+      }
+    });
+
+    res.status(201).json({ checklist });
+  } catch (error) {
+    console.error('Create checklist error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const createChecklistItem = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { checklistId } = req.params;
+    const { title } = req.body;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    if (!title || title.trim().length === 0) {
+      return res.status(400).json({ error: 'Checklist item title is required' });
+    }
+
+    // Check if checklist exists and user has access
+    const checklist = await prisma.checklist.findUnique({
+      where: { id: checklistId },
+      include: {
+        card: {
+          include: {
+            list: {
+              include: {
+                board: {
+                  include: {
+                    members: {
+                      where: { userId }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!checklist) {
+      return res.status(404).json({ error: 'Checklist not found' });
+    }
+
+    const isOwner = checklist.card.list.board.ownerId === userId;
+    const isMember = checklist.card.list.board.members.length > 0;
+
+    if (!isOwner && !isMember) {
+      return res.status(403).json({ error: 'Not authorized to add item to this checklist' });
+    }
+
+    // Get the next position for this item
+    const maxPosition = await prisma.checklistItem.findFirst({
+      where: { checklistId },
+      orderBy: { position: 'desc' }
+    });
+    const position = maxPosition ? maxPosition.position + 1 : 0;
+
+    const item = await prisma.checklistItem.create({
+      data: {
+        title: title.trim(),
+        checklistId,
+        position
+      }
+    });
+
+    res.status(201).json({ item });
+  } catch (error) {
+    console.error('Create checklist item error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const updateChecklistItem = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { itemId } = req.params;
+    const { completed } = req.body;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    if (typeof completed !== 'boolean') {
+      return res.status(400).json({ error: 'Completed status must be a boolean' });
+    }
+
+    // Check if item exists and user has access
+    const item = await prisma.checklistItem.findUnique({
+      where: { id: itemId },
+      include: {
+        checklist: {
+          include: {
+            card: {
+              include: {
+                list: {
+                  include: {
+                    board: {
+                      include: {
+                        members: {
+                          where: { userId }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!item) {
+      return res.status(404).json({ error: 'Checklist item not found' });
+    }
+
+    const isOwner = item.checklist.card.list.board.ownerId === userId;
+    const isMember = item.checklist.card.list.board.members.length > 0;
+
+    if (!isOwner && !isMember) {
+      return res.status(403).json({ error: 'Not authorized to update this checklist item' });
+    }
+
+    const updatedItem = await prisma.checklistItem.update({
+      where: { id: itemId },
+      data: { completed }
+    });
+
+    res.json({ item: updatedItem });
+  } catch (error) {
+    console.error('Update checklist item error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const deleteChecklist = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { checklistId } = req.params;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    // Check if checklist exists and user has access
+    const checklist = await prisma.checklist.findUnique({
+      where: { id: checklistId },
+      include: {
+        card: {
+          include: {
+            list: {
+              include: {
+                board: {
+                  include: {
+                    members: {
+                      where: { userId }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!checklist) {
+      return res.status(404).json({ error: 'Checklist not found' });
+    }
+
+    const isOwner = checklist.card.list.board.ownerId === userId;
+    const isMember = checklist.card.list.board.members.length > 0;
+
+    if (!isOwner && !isMember) {
+      return res.status(403).json({ error: 'Not authorized to delete this checklist' });
+    }
+
+    await prisma.checklist.delete({
+      where: { id: checklistId }
+    });
+
+    res.json({ message: 'Checklist deleted successfully' });
+  } catch (error) {
+    console.error('Delete checklist error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const deleteChecklistItem = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { itemId } = req.params;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    // Check if item exists and user has access
+    const item = await prisma.checklistItem.findUnique({
+      where: { id: itemId },
+      include: {
+        checklist: {
+          include: {
+            card: {
+              include: {
+                list: {
+                  include: {
+                    board: {
+                      include: {
+                        members: {
+                          where: { userId }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!item) {
+      return res.status(404).json({ error: 'Checklist item not found' });
+    }
+
+    const isOwner = item.checklist.card.list.board.ownerId === userId;
+    const isMember = item.checklist.card.list.board.members.length > 0;
+
+    if (!isOwner && !isMember) {
+      return res.status(403).json({ error: 'Not authorized to delete this checklist item' });
+    }
+
+    await prisma.checklistItem.delete({
+      where: { id: itemId }
+    });
+
+    res.json({ message: 'Checklist item deleted successfully' });
+  } catch (error) {
+    console.error('Delete checklist item error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};

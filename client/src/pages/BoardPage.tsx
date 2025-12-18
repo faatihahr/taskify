@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import type { DropResult } from '@hello-pangea/dnd';
 import { Button } from '../components/ui/button';
-import { Plus, ChevronLeft } from 'lucide-react';
+import { Plus, ChevronLeft, Image as ImageIcon, CheckSquare } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { fetchBoardById, reorderCards, updateCardPosition, moveList, updateTaskCoverImage } from '../store/boardsSlice';
 import CreateListModal from '../components/lists/CreateListModal';
@@ -11,20 +11,71 @@ import CreateCardModal from '../components/cards/CreateCardModal';
 import TaskDetailModal from '../components/cards/TaskDetailModal';
 import { useNavigate } from 'react-router-dom';
 
-// Color palette for lists
+// Color palette for lists with dark mode variants
 const listColors = [
-  'bg-blue-100 border-blue-300',
-  'bg-green-100 border-green-300', 
-  'bg-yellow-100 border-yellow-300',
-  'bg-purple-100 border-purple-300',
-  'bg-pink-100 border-pink-300',
-  'bg-indigo-100 border-indigo-300',
-  'bg-red-100 border-red-300',
-  'bg-orange-100 border-orange-300',
+  'bg-blue-100 border-blue-300 dark:bg-blue-900/50 dark:border-blue-700',
+  'bg-green-100 border-green-300 dark:bg-green-900/50 dark:border-green-700',
+  'bg-yellow-100 border-yellow-300 dark:bg-yellow-900/50 dark:border-yellow-700',
+  'bg-purple-100 border-purple-300 dark:bg-purple-900/50 dark:border-purple-700',
+  'bg-pink-100 border-pink-300 dark:bg-pink-900/50 dark:border-pink-700',
+  'bg-indigo-100 border-indigo-300 dark:bg-indigo-900/50 dark:border-indigo-700',
+  'bg-red-100 border-red-300 dark:bg-red-900/50 dark:border-red-700',
+  'bg-orange-100 border-orange-300 dark:bg-orange-900/50 dark:border-orange-700',
 ];
+
+// Utility function to validate and format image URLs
+const validateImageUrl = (imageUrl: string): string => {
+  if (!imageUrl) return '';
+  
+  if (imageUrl.startsWith('blob:')) {
+    // Blob URLs are temporary and may expire
+    // We'll try to use them but they might fail
+    return imageUrl;
+  } else if (imageUrl.startsWith('/uploads')) {
+    // Server uploaded images need full URL
+    return `http://localhost:3000${imageUrl}`;
+  } else if (imageUrl.startsWith('http')) {
+    // Full URLs should be used as-is
+    return imageUrl;
+  } else if (imageUrl.startsWith('data:')) {
+    // Base64 images should be used as-is
+    return imageUrl;
+  } else {
+    // Fallback for any other format
+    return imageUrl;
+  }
+};
 
 const TaskCard: React.FC<{ task: any; index: number; onClick: () => void }> = ({ task, index, onClick }) => {
   console.log('TaskCard rendered:', { taskId: task.id, taskTitle: task.title, index });
+  const [imageError, setImageError] = useState(false);
+  
+  // Calculate checklist completion
+  const getChecklistCompletion = () => {
+    if (!task.checklists || task.checklists.length === 0) return null;
+    
+    let totalItems = 0;
+    let completedItems = 0;
+    
+    task.checklists.forEach((checklist: any) => {
+      if (checklist.items && checklist.items.length > 0) {
+        totalItems += checklist.items.length;
+        completedItems += checklist.items.filter((item: any) => item.completed).length;
+      }
+    });
+    
+    if (totalItems === 0) return null;
+    
+    const percentage = Math.round((completedItems / totalItems) * 100);
+    return {
+      percentage,
+      isComplete: percentage === 100,
+      totalItems,
+      completedItems
+    };
+  };
+  
+  const checklistCompletion = getChecklistCompletion();
   
   return (
     <Draggable draggableId={task.id} index={index}>
@@ -34,50 +85,64 @@ const TaskCard: React.FC<{ task: any; index: number; onClick: () => void }> = ({
           {...provided.draggableProps}
           {...provided.dragHandleProps}
           onClick={onClick}
-          className={`bg-white rounded-lg border border-gray-200 cursor-pointer hover:shadow-md transition-all overflow-hidden ${
-            snapshot.isDragging ? 'shadow-xl rotate-1' : 'hover:-translate-y-1'
+          className={`bg-card rounded-lg border border-border cursor-pointer hover:shadow-md overflow-hidden ${
+            snapshot.isDragging ? 'shadow-xl' : ''
           }`}
         >
           {/* Cover Image */}
-          {(() => {
-            console.log('Task coverImage:', task.coverImage);
-            const imageUrl = task.coverImage?.startsWith('/uploads') ? `http://localhost:3000${task.coverImage}` : task.coverImage;
-            console.log('Final image URL:', imageUrl);
-            return task.coverImage;
-          })() && (
-            <div className="w-full h-24 overflow-hidden border-2 border-red-500">
-              <img 
-                src={task.coverImage?.startsWith('/uploads') ? `http://localhost:3000${task.coverImage}` : task.coverImage} 
+          {task.coverImage && !imageError ? (
+            <div className="w-full h-24 overflow-hidden">
+              <img
+                src={validateImageUrl(task.coverImage)}
                 alt={task.title}
                 className="w-full h-full object-cover"
-                onLoad={() => console.log('Image loaded successfully:', task.coverImage)}
                 onError={(e) => {
                   console.error('Image load error:', e);
                   console.error('Image src:', task.coverImage);
+                  setImageError(true);
                 }}
               />
             </div>
-          )}
-          
+          ) : task.coverImage && imageError ? (
+            <div className="w-full h-24 bg-muted flex items-center justify-center text-muted-foreground text-xs border-b">
+              <ImageIcon className="w-4 h-4 mr-1" />
+              Image unavailable
+            </div>
+          ) : null}
+
           <div className="p-3 sm:p-4">
-            <h4 className="text-xs sm:text-sm font-semibold text-gray-800 line-clamp-2">
+            <h4 className="text-xs sm:text-sm font-semibold text-card-foreground line-clamp-2">
               {task.title}
             </h4>
             {task.description && (
-              <p className="text-xs text-gray-600 mt-1 sm:mt-2 line-clamp-2 sm:line-clamp-3">
+              <p className="text-xs text-muted-foreground mt-1 sm:mt-2 line-clamp-2 sm:line-clamp-3">
                 {task.description}
               </p>
             )}
-            
+
             {/* Priority indicator */}
             <div className="flex items-center justify-between mt-2 sm:mt-3">
               <div className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-blue-500 rounded-full"></div>
-                <span className="text-xs text-gray-500 hidden sm:inline">Task</span>
+                <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-primary rounded-full"></div>
+                <span className="text-xs text-muted-foreground hidden sm:inline">Task</span>
+                {/* Checklist Badge */}
+                {checklistCompletion && (
+                  <div 
+                    className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                      checklistCompletion.isComplete 
+                        ? 'bg-green-100 text-green-700 border border-green-200' 
+                        : 'bg-gray-100 text-gray-600 border border-gray-200'
+                    }`}
+                    title={`${checklistCompletion.completedItems}/${checklistCompletion.totalItems} items completed`}
+                  >
+                    <CheckSquare className="h-3 w-3" />
+                    {checklistCompletion.percentage}%
+                  </div>
+                )}
               </div>
-              <div className="flex items-center gap-1 text-gray-400">
-                <div className="w-0.5 h-2 sm:w-1 sm:h-3 bg-gray-300 rounded-full"></div>
-                <div className="w-0.5 h-2 sm:w-1 sm:h-3 bg-gray-300 rounded-full"></div>
+              <div className="flex items-center gap-1 text-muted-foreground">
+                <div className="w-0.5 h-2 sm:w-1 sm:h-3 bg-muted-foreground rounded-full"></div>
+                <div className="w-0.5 h-2 sm:w-1 sm:h-3 bg-muted-foreground rounded-full"></div>
               </div>
             </div>
           </div>
@@ -97,6 +162,7 @@ const BoardPage: React.FC = () => {
   const [showTaskDetailModal, setShowTaskDetailModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState<any>(null);
   const [selectedListId, setSelectedListId] = useState<string | null>(null);
+  const [taskUpdateCounter, setTaskUpdateCounter] = useState(0);
 
   useEffect(() => {
     if (boardId) {
@@ -120,12 +186,12 @@ const BoardPage: React.FC = () => {
 
   const handleCoverImageUpdate = async (taskId: string, newCoverImage: string) => {
     console.log('handleCoverImageUpdate in BoardPage:', { taskId, newCoverImage });
-    
+
     try {
       // Dispatch action to update task cover image in Redux store
       await dispatch(updateTaskCoverImage({ taskId, coverImage: newCoverImage })).unwrap();
       console.log('Task cover image updated successfully in Redux store');
-      
+
       // Update selectedTask for immediate UI update
       if (selectedTask && selectedTask.id === taskId) {
         const updatedTask = { ...selectedTask, coverImage: newCoverImage };
@@ -134,6 +200,26 @@ const BoardPage: React.FC = () => {
       }
     } catch (error) {
       console.error('Failed to update task cover image:', error);
+    }
+  };
+
+  const handleCommentAdded = (taskId: string) => {
+    console.log('handleCommentAdded called for taskId:', taskId);
+
+    // Find the updated task from Redux store and update selectedTask
+    if (currentBoard) {
+      for (const list of currentBoard.lists) {
+        const card = list.cards.find(card => card.id === taskId);
+        if (card) {
+          console.log('Updated task found in Redux store:', card);
+          console.log('Card comments in handleCommentAdded:', card.comments);
+          // Create a new object to ensure React detects the change
+          setSelectedTask({ ...card });
+          // Force re-render by updating counter
+          setTaskUpdateCounter(prev => prev + 1);
+          break;
+        }
+      }
     }
   };
 
@@ -223,6 +309,11 @@ const BoardPage: React.FC = () => {
     }));
 
     try {
+      console.log('=== CARD MOVEMENT DEBUG ===');
+      console.log('Source:', { listId: source.droppableId, index: source.index });
+      console.log('Destination:', { listId: destination.droppableId, index: destination.index });
+      console.log('Card ID:', draggableId);
+      
       await dispatch(updateCardPosition({
         cardId: draggableId,
         listId: destination.droppableId,
@@ -230,12 +321,16 @@ const BoardPage: React.FC = () => {
       })).unwrap();
       console.log('Card position updated successfully');
       
-      // Refetch to ensure state is persisted
-      if (boardId) {
-        dispatch(fetchBoardById(boardId));
-      }
+      // Don't refetch immediately - let the optimistic update handle UI
+      // Only refetch if there's an error or after a delay
+      setTimeout(() => {
+        if (boardId) {
+          dispatch(fetchBoardById(boardId));
+        }
+      }, 1000);
     } catch (error) {
       console.error('Failed to update card position:', error);
+      // Refetch on error to restore correct state
       if (boardId) {
         dispatch(fetchBoardById(boardId));
       }
@@ -254,7 +349,7 @@ const BoardPage: React.FC = () => {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-xl font-semibold text-red-600 mb-2">Error loading board</h2>
+          <h2 className="text-xl font-semibold text-destructive mb-2">Error loading board</h2>
           <p className="text-muted-foreground">{error}</p>
         </div>
       </div>
@@ -273,34 +368,34 @@ const BoardPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
+    <div className="min-h-screen bg-gradient-to-br from-background via-muted/20 to-background dark:from-background dark:via-muted/10 dark:to-background">
       {/* Board Header */}
-      <div className="bg-white/90 backdrop-blur-md border-b border-purple-200 px-4 sm:px-6 py-3 sm:py-4 shadow-lg">
+      <div className="bg-card/80 backdrop-blur-md border-b border-border px-4 sm:px-6 py-3 sm:py-4 shadow-lg">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2 sm:gap-4">
             <Button
               variant="ghost"
               size="sm"
               onClick={handleBackToDashboard}
-              className="flex items-center gap-2 text-purple-600 hover:text-purple-800 hover:bg-purple-100 p-2 sm:p-0"
+              className="flex items-center gap-2 p-2 sm:p-0"
             >
               <ChevronLeft className="h-4 w-4" />
               <span className="hidden sm:inline">Back</span>
             </Button>
             <div className="min-w-0 flex-1">
-              <h1 className="text-lg sm:text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent truncate">
+              <h1 className="text-lg sm:text-2xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent truncate">
                 {currentBoard.title}
               </h1>
               {currentBoard.description && (
-                <p className="text-gray-600 text-xs sm:text-sm mt-1 line-clamp-1 sm:line-clamp-none">
+                <p className="text-muted-foreground text-xs sm:text-sm mt-1 line-clamp-1 sm:line-clamp-none">
                   {currentBoard.description}
                 </p>
               )}
             </div>
           </div>
-          <Button 
+          <Button
             onClick={handleCreateList}
-            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-3 py-2 sm:px-4 shadow-md hover:shadow-lg w-full sm:w-auto"
+            className="px-3 py-2 sm:px-4 shadow-md hover:shadow-lg w-full sm:w-auto"
           >
             <Plus className="h-4 w-4 mr-2" />
             <span className="hidden sm:inline">Add List</span>
@@ -310,11 +405,11 @@ const BoardPage: React.FC = () => {
       </div>
 
       {/* Board Content */}
-      <div className="p-3 sm:p-6 overflow-x-auto">
+      <div className="p-3 sm:p-6">
         <DragDropContext onDragEnd={handleDragEnd}>
-          <Droppable 
-            droppableId="lists" 
-            direction="horizontal" 
+          <Droppable
+            droppableId="lists"
+            direction="horizontal"
             type="COLUMN"
           >
             {(provided: any, snapshot: any) => (
@@ -322,11 +417,8 @@ const BoardPage: React.FC = () => {
                 {...provided.droppableProps}
                 ref={provided.innerRef}
                 className={`flex gap-2 sm:gap-4 min-h-[calc(100vh-150px)] sm:min-h-[calc(100vh-200px)] transition-colors duration-200 ${
-                  snapshot.isDraggingOver ? 'bg-blue-50/50' : ''
+                  snapshot.isDraggingOver ? 'bg-primary/5' : ''
                 }`}
-                style={{
-                  minWidth: `${Math.max(currentBoard.lists.length * (window.innerWidth < 640 ? 280 : 320) + 50, window.innerWidth)}px`,
-                }}
               >
                 {currentBoard.lists.map((list: any, index: number) => (
                   <Draggable key={list.id} draggableId={list.id} index={index}>
@@ -334,8 +426,8 @@ const BoardPage: React.FC = () => {
                       <div
                         ref={provided.innerRef}
                         {...provided.draggableProps}
-                        className={`w-64 sm:w-72 ${listColors[index % listColors.length]} rounded-lg flex-shrink-0 border-2 shadow-md transition-transform ${
-                          snapshot.isDragging ? 'transform rotate-2 shadow-xl' : ''
+                        className={`w-64 sm:w-72 ${listColors[index % listColors.length]} rounded-lg flex-shrink-0 border-2 shadow-md transition-shadow ${
+                          snapshot.isDragging ? 'shadow-2xl' : ''
                         }`}
                         style={{
                           ...provided.draggableProps.style,
@@ -343,13 +435,13 @@ const BoardPage: React.FC = () => {
                       >
                         <div
                           {...provided.dragHandleProps}
-                          className="px-3 sm:px-4 py-2 sm:py-3 border-b border-white/30 cursor-move"
+                          className="px-3 sm:px-4 py-2 sm:py-3 border-b border-border/30 cursor-move"
                         >
                           <div className="flex items-center justify-between">
-                            <h3 className="font-semibold text-gray-800 text-sm sm:text-base truncate">
+                            <h3 className="font-semibold text-foreground text-sm sm:text-base truncate">
                               {list.title}
                             </h3>
-                            <span className="text-xs sm:text-sm font-bold text-gray-800 bg-white/60 px-2 py-1 rounded-full shadow-sm flex-shrink-0">
+                            <span className="text-xs sm:text-sm font-bold text-foreground bg-background/60 px-2 py-1 rounded-full shadow-sm flex-shrink-0">
                               {list.cards?.length || 0}
                             </span>
                           </div>
@@ -360,13 +452,13 @@ const BoardPage: React.FC = () => {
                               <div
                                 {...provided.droppableProps}
                                 ref={provided.innerRef}
-                                className="space-y-1 sm:space-y-2 min-h-[150px] sm:min-h-[200px]"
+                                className="space-y-1 sm:space-y-2 min-h-[200px] sm:min-h-[300px]"
                               >
                                 {list.cards.map((task: any, taskIndex: number) => (
-                                  <TaskCard 
-                                    key={task.id} 
-                                    task={task} 
-                                    index={taskIndex} 
+                                  <TaskCard
+                                    key={task.id}
+                                    task={task}
+                                    index={taskIndex}
                                     onClick={() => handleTaskClick(task)}
                                   />
                                 ))}
@@ -378,7 +470,7 @@ const BoardPage: React.FC = () => {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleAddTask(list.id)}
-                            className="w-full justify-start text-gray-600 hover:text-gray-800 hover:bg-white/50 mt-1 sm:mt-2 text-xs sm:text-sm py-1 sm:py-2"
+                            className="w-full justify-start mt-1 sm:mt-2 text-xs sm:text-sm py-1 sm:py-2"
                           >
                             <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
                             Add task
@@ -417,9 +509,11 @@ const BoardPage: React.FC = () => {
 
       {showTaskDetailModal && selectedTask && (
         <TaskDetailModal
+          key={`task-${selectedTask.id}-${taskUpdateCounter}`}
           task={selectedTask}
           isOpen={showTaskDetailModal}
           onCoverImageUpdate={handleCoverImageUpdate}
+          onCommentAdded={handleCommentAdded}
           onClose={() => {
             setShowTaskDetailModal(false);
             setSelectedTask(null);

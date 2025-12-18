@@ -1,4 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { useDispatch } from 'react-redux';
+import { useAppSelector } from '../../store/hooks';
+import { updateTaskDescription, createComment, createChecklist } from '../../store/boardsSlice';
+import type { AppDispatch } from '../../store';
 import { Button } from '../ui/button';
 import { 
   X, 
@@ -16,37 +20,115 @@ import {
   Upload,
   Search
 } from 'lucide-react';
+import ChecklistComponent from '../checklist/Checklist';
+
+// Utility function to validate and format image URLs
+const validateImageUrl = (imageUrl: string): string => {
+  if (!imageUrl) return '';
+  
+  if (imageUrl.startsWith('blob:')) {
+    // Blob URLs are temporary and may expire
+    // We'll try to use them but they might fail
+    return imageUrl;
+  } else if (imageUrl.startsWith('/uploads')) {
+    // Server uploaded images need full URL
+    return `http://localhost:3000${imageUrl}`;
+  } else if (imageUrl.startsWith('http')) {
+    // Full URLs should be used as-is
+    return imageUrl;
+  } else if (imageUrl.startsWith('data:')) {
+    // Base64 images should be used as-is
+    return imageUrl;
+  } else {
+    // Fallback for any other format
+    return imageUrl;
+  }
+};
 
 interface TaskDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   task: any;
   onCoverImageUpdate: (taskId: string, newCoverImage: string) => void;
+  onCommentAdded: (taskId: string) => void;
 }
 
-const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task, onCoverImageUpdate }) => {
+const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task, onCoverImageUpdate, onCommentAdded }) => {
+  const dispatch = useDispatch<AppDispatch>();
+  const { currentBoard } = useAppSelector((state) => state.boards);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [description, setDescription] = useState(task?.description || '');
   const [showActivityDetails, setShowActivityDetails] = useState(false);
   const [comment, setComment] = useState('');
   const [isCoverImageModalOpen, setIsCoverImageModalOpen] = useState(false);
   const [currentCoverImage, setCurrentCoverImage] = useState(task?.coverImage || '');
+  const [coverImageError, setCoverImageError] = useState(false);
+  const checklistRef = useRef<HTMLDivElement>(null);
+  const [showHeaderAddChecklist, setShowHeaderAddChecklist] = useState(false);
+  const [headerChecklistTitle, setHeaderChecklistTitle] = useState('');
+
+  // Get comments directly from Redux store
+  const comments = useMemo(() => {
+    if (!currentBoard || !task?.id) return [];
+    for (const list of currentBoard.lists) {
+      const card = list.cards.find(card => card.id === task.id);
+      if (card) {
+        return card.comments || [];
+      }
+    }
+    return [];
+  }, [currentBoard, task?.id]);
+
+  // Get checklists directly from Redux store
+  const checklists = useMemo(() => {
+    if (!currentBoard || !task?.id) return [];
+    for (const list of currentBoard.lists) {
+      const card = list.cards.find(card => card.id === task.id);
+      if (card) {
+        return card.checklists || [];
+      }
+    }
+    return [];
+  }, [currentBoard, task?.id]);
 
   useEffect(() => {
     console.log('TaskDetailModal - task.coverImage updated:', task?.coverImage);
     setCurrentCoverImage(task?.coverImage || '');
+    setCoverImageError(false); // Reset error state when cover image changes
+    
+    // Test if the image URL is valid
+    if (task?.coverImage) {
+      const img = new Image();
+      img.onload = () => setCoverImageError(false);
+      img.onerror = () => setCoverImageError(true);
+      img.src = validateImageUrl(task.coverImage);
+    }
   }, [task?.coverImage]);
 
-  const handleSaveDescription = () => {
-    // Here you would save the description to your backend
-    setIsEditingDescription(false);
+  useEffect(() => {
+    setDescription(task?.description || '');
+  }, [task?.description]);
+
+  const handleSaveDescription = async () => {
+    try {
+      await dispatch(updateTaskDescription({ taskId: task.id, description }));
+      setIsEditingDescription(false);
+    } catch (error: unknown) {
+      console.error('Failed to save description:', error);
+    }
   };
 
-  const handleAddComment = () => {
+  const handleAddComment = async () => {
     if (comment.trim()) {
-      // Here you would save the comment to your backend
-      console.log('Adding comment:', comment);
-      setComment('');
+      try {
+        await dispatch(createComment({ cardId: task.id, content: comment }));
+        setComment('');
+        // Update selectedTask in parent component to reflect new comment
+        // Wait a bit for Redux store to be updated before calling onCommentAdded
+        setTimeout(() => onCommentAdded(task.id), 200);
+      } catch (error: unknown) {
+        console.error('Failed to add comment:', error);
+      }
     }
   };
 
@@ -54,6 +136,35 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
     setCurrentCoverImage(newCoverImage);
     onCoverImageUpdate(task.id, newCoverImage);
     console.log('Updating cover image:', newCoverImage);
+  };
+
+  const scrollToChecklist = () => {
+    console.log('Header Checklist button clicked!');
+    console.log('checklistRef.current:', checklistRef.current);
+    if (checklistRef.current) {
+      console.log('Scrolling to checklist section...');
+      checklistRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      console.log('checklistRef.current is null');
+    }
+  };
+
+  const handleHeaderAddChecklist = async () => {
+    if (headerChecklistTitle.trim()) {
+      try {
+        console.log('Creating checklist from header:', headerChecklistTitle);
+        await dispatch(createChecklist({ cardId: task.id, title: headerChecklistTitle.trim() })).unwrap();
+        console.log('Checklist created successfully from header');
+        setHeaderChecklistTitle('');
+        setShowHeaderAddChecklist(false);
+        // Scroll to checklist section after creation
+        setTimeout(() => {
+          scrollToChecklist();
+        }, 100);
+      } catch (error) {
+        console.error('Failed to create checklist from header:', error);
+      }
+    }
   };
 
   if (!isOpen || !task) return null;
@@ -65,14 +176,14 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Header */}
           <div className="bg-gradient-to-r from-gray-800 to-gray-900 text-white p-6 relative overflow-hidden">
-            {currentCoverImage && (
+            {currentCoverImage && !coverImageError ? (
               <div
                 className="absolute inset-0 bg-cover bg-center opacity-30"
                 style={{ 
-                  backgroundImage: `url(${currentCoverImage?.startsWith('/uploads') ? `http://localhost:3000${currentCoverImage}` : currentCoverImage})` 
+                  backgroundImage: `url(${validateImageUrl(currentCoverImage)})` 
                 }}
               ></div>
-            )}
+            ) : null}
             <div className="absolute top-4 right-4 flex items-center gap-2">
               <Button variant="ghost" size="sm" className="text-white hover:bg-white/20 cursor-pointer">
                 <Volume2 className="h-4 w-4" />
@@ -131,7 +242,13 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
                 <Calendar className="h-3 w-3 mr-1" />
                 Dates
               </Button>
-              <Button variant="ghost" size="sm" className="text-white hover:bg-white/20 border border-white/30 cursor-pointer">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setShowHeaderAddChecklist(true)}
+                className="text-white hover:bg-white/20 border border-white/30 cursor-pointer transition-all duration-200 hover:scale-105"
+                style={{ pointerEvents: 'auto', zIndex: 20, position: 'relative' }}
+              >
                 <CheckSquare className="h-3 w-3 mr-1" />
                 Checklist
               </Button>
@@ -141,6 +258,49 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
               </Button>
             </div>
           </div>
+
+          {/* Header Checklist Input Modal */}
+          {showHeaderAddChecklist && (
+            <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Add New Checklist</h3>
+                <input
+                  type="text"
+                  value={headerChecklistTitle}
+                  onChange={(e) => setHeaderChecklistTitle(e.target.value)}
+                  placeholder="Checklist title..."
+                  className="w-full px-3 py-2 mb-4 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  autoFocus
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      handleHeaderAddChecklist();
+                    }
+                  }}
+                />
+                <div className="flex gap-2 justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setShowHeaderAddChecklist(false);
+                      setHeaderChecklistTitle('');
+                    }}
+                    className="px-4 py-2"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleHeaderAddChecklist}
+                    disabled={!headerChecklistTitle.trim()}
+                    className="px-4 py-2"
+                  >
+                    Add
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Content */}
           <div className="flex-1 overflow-y-auto p-6">
@@ -166,7 +326,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
                   <textarea
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    className="w-full min-h-[120px] p-3 border rounded-md resize-none text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full min-h-[120px] p-3 border rounded-md resize-none text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600"
                     placeholder="Add a more detailed description..."
                   />
                   <div className="flex gap-2">
@@ -195,6 +355,12 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
                   )}
                 </div>
               )}
+            </div>
+
+            {/* Checklist Section */}
+            <div ref={checklistRef} className="mb-8 relative" style={{ zIndex: 1 }}>
+              <h2 className="text-lg font-semibold text-gray-800 mb-3">Checklist</h2>
+              <ChecklistComponent cardId={task.id} checklists={checklists} />
             </div>
 
             {/* Workflow Section */}
@@ -263,7 +429,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
                 placeholder="Write a comment..."
-                className="w-full min-h-[80px] p-3 border rounded-md resize-none text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full min-h-[80px] p-3 border rounded-md resize-none text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600"
               />
               <Button 
                 onClick={handleAddComment}
@@ -273,6 +439,37 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
                 Send Comment
               </Button>
             </div>
+
+            {/* Comments List */}
+            {comments && comments.length > 0 && (
+              <div className="mt-4 space-y-3">
+                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">Comments</h4>
+                <div className="max-h-64 overflow-y-auto space-y-2 pr-2">
+                  {comments.map((comment: any) => (
+                    <div key={comment.id} className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                      <div className="flex items-start gap-2">
+                        <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
+                          {comment.user?.name?.charAt(0)?.toUpperCase() || 'U'}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                              {comment.user?.name || 'Unknown User'}
+                            </span>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              {new Date(comment.createdAt).toLocaleString()}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                            {comment.content}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Activity Feed */}
@@ -328,9 +525,14 @@ const CoverImageModal: React.FC<{
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const preview = URL.createObjectURL(file);
-      setSelectedImage(preview);
+    if (file && file.type.startsWith('image/')) {
+      // Convert image to base64 for persistence
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        setSelectedImage(base64String);
+      };
+      reader.readAsDataURL(file);
     }
   };
 

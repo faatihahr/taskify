@@ -20,6 +20,7 @@ interface Card {
   }
   labels: any[]
   comments: any[]
+  checklists: any[]
   _count: {
     comments: number
     attachments: number
@@ -127,7 +128,9 @@ export const createCard = createAsyncThunk(
 export const moveList = createAsyncThunk(
   'boards/moveList',
   async ({ listId, position }: { listId: string; position: number }) => {
-    const response = await api.put(`/api/lists/${listId}`, { position })
+    console.log('moveList API call:', { listId, position, endpoint: `/api/lists/${listId}/move` });
+    const response = await api.put(`/api/lists/${listId}/move`, { position })
+    console.log('moveList API response:', response.data);
     return response.data.list
   }
 )
@@ -136,7 +139,7 @@ export const updateCardPosition = createAsyncThunk(
   'boards/updateCardPosition',
   async ({ cardId, listId, position }: { cardId: string; listId: string; position: number }) => {
     const response = await api.put(`/api/cards/${cardId}`, { listId, position })
-    return response.data.card
+    return response.data
   }
 )
 
@@ -153,6 +156,92 @@ export const updateTaskCoverImage = createAsyncThunk(
     } else {
       throw new Error('No data returned from API');
     }
+  }
+)
+
+export const updateTaskDescription = createAsyncThunk(
+  'boards/updateTaskDescription',
+  async ({ taskId, description }: { taskId: string; description: string }) => {
+    const response = await api.put(`/api/cards/${taskId}`, { description })
+    console.log('API response for updateTaskDescription:', response.data);
+    
+    if (response.data) {
+      return response.data;
+    } else {
+      throw new Error('No data returned from API');
+    }
+  }
+)
+
+export const createComment = createAsyncThunk(
+  'boards/createComment',
+  async ({ cardId, content }: { cardId: string; content: string }) => {
+    const response = await api.post(`/api/cards/${cardId}/comments`, { content })
+    console.log('API response for createComment:', response.data);
+    
+    if (response.data.comment) {
+      return response.data.comment;
+    } else {
+      throw new Error('No comment data returned from API');
+    }
+  }
+)
+
+export const createChecklist = createAsyncThunk(
+  'boards/createChecklist',
+  async ({ cardId, title }: { cardId: string; title: string }) => {
+    const response = await api.post(`/api/cards/${cardId}/checklists`, { title })
+    console.log('API response for createChecklist:', response.data);
+    
+    if (response.data.checklist) {
+      return response.data.checklist;
+    } else {
+      throw new Error('No checklist data returned from API');
+    }
+  }
+)
+
+export const createChecklistItem = createAsyncThunk(
+  'boards/createChecklistItem',
+  async ({ checklistId, title }: { checklistId: string; title: string }) => {
+    const response = await api.post(`/api/cards/checklists/${checklistId}/items`, { title })
+    console.log('API response for createChecklistItem:', response.data);
+    
+    if (response.data.item) {
+      return response.data.item;
+    } else {
+      throw new Error('No checklist item data returned from API');
+    }
+  }
+)
+
+export const updateChecklistItem = createAsyncThunk(
+  'boards/updateChecklistItem',
+  async ({ itemId, completed }: { itemId: string; completed: boolean }) => {
+    const response = await api.put(`/api/cards/checklists/items/${itemId}`, { completed })
+    console.log('API response for updateChecklistItem:', response.data);
+    
+    if (response.data.item) {
+      return response.data.item;
+    } else {
+      throw new Error('No checklist item data returned from API');
+    }
+  }
+)
+
+export const deleteChecklist = createAsyncThunk(
+  'boards/deleteChecklist',
+  async ({ checklistId }: { checklistId: string }) => {
+    await api.delete(`/api/cards/checklists/${checklistId}`)
+    return checklistId;
+  }
+)
+
+export const deleteChecklistItem = createAsyncThunk(
+  'boards/deleteChecklistItem',
+  async ({ itemId }: { itemId: string }) => {
+    await api.delete(`/api/cards/checklists/items/${itemId}`)
+    return itemId;
   }
 )
 
@@ -253,9 +342,12 @@ const boardsSlice = createSlice({
       })
       // Move list
       .addCase(moveList.fulfilled, (state, action) => {
+        console.log('moveList.fulfilled triggered:', action.payload);
         if (state.currentBoard) {
           const movedList = action.payload;
           const listIndex = state.currentBoard.lists.findIndex(list => list.id === movedList.id);
+          
+          console.log('List movement in Redux:', { movedList, listIndex, currentLists: state.currentBoard.lists.length });
           
           if (listIndex !== -1) {
             // Remove from old position
@@ -267,6 +359,8 @@ const boardsSlice = createSlice({
             state.currentBoard.lists.forEach((list, index) => {
               list.position = index;
             });
+            
+            console.log('Lists after movement:', state.currentBoard.lists.map(l => ({ id: l.id, title: l.title, position: l.position })));
           }
         }
       })
@@ -344,6 +438,192 @@ const boardsSlice = createSlice({
       })
       .addCase(updateTaskCoverImage.rejected, (_, action) => {
         console.error('Failed to update task cover image:', action.error.message);
+      })
+      // Update task description
+      .addCase(updateTaskDescription.fulfilled, (state, action) => {
+        console.log('updateTaskDescription.fulfilled payload:', action.payload);
+        
+        if (state.currentBoard && action.payload) {
+          const updatedCard = action.payload;
+          
+          // Find and update the card in the current board
+          for (const list of state.currentBoard.lists) {
+            const cardIndex = list.cards.findIndex(card => card.id === updatedCard.id);
+            if (cardIndex !== -1) {
+              list.cards[cardIndex] = updatedCard;
+              console.log('Card description updated in Redux store:', updatedCard);
+              break;
+            }
+          }
+        } else {
+          console.error('updateTaskDescription: No payload or currentBoard');
+        }
+      })
+      .addCase(updateTaskDescription.rejected, (_, action) => {
+        console.error('Failed to update task description:', action.error.message);
+      })
+      // Create comment
+      .addCase(createComment.fulfilled, (state, action) => {
+        console.log('createComment.fulfilled payload:', action.payload);
+        
+        if (state.currentBoard && action.payload) {
+          const newComment = action.payload;
+          
+          // Find the card and add the comment to its comments array
+          for (const list of state.currentBoard.lists) {
+            const cardIndex = list.cards.findIndex(card => card.id === newComment.cardId);
+            if (cardIndex !== -1) {
+              // Initialize comments array if it doesn't exist
+              if (!list.cards[cardIndex].comments) {
+                list.cards[cardIndex].comments = [];
+              }
+        list.cards[cardIndex].comments.push(newComment);
+        console.log('Comment added to card in Redux store:', newComment);
+        console.log('Card comments after update:', list.cards[cardIndex].comments);
+              break;
+            }
+          }
+        } else {
+          console.error('createComment: No payload or currentBoard');
+        }
+      })
+      .addCase(createComment.rejected, (_, action) => {
+        console.error('Failed to create comment:', action.error.message);
+      })
+      // Create checklist
+      .addCase(createChecklist.fulfilled, (state, action) => {
+        console.log('createChecklist.fulfilled payload:', action.payload);
+        
+        if (state.currentBoard && action.payload) {
+          const newChecklist = action.payload;
+          
+          // Find the card and add the checklist to its checklists array
+          for (const list of state.currentBoard.lists) {
+            const cardIndex = list.cards.findIndex(card => card.id === newChecklist.cardId);
+            if (cardIndex !== -1) {
+              // Initialize checklists array if it doesn't exist
+              if (!list.cards[cardIndex].checklists) {
+                list.cards[cardIndex].checklists = [];
+              }
+              list.cards[cardIndex].checklists.push(newChecklist);
+              console.log('Checklist added to card in Redux store:', newChecklist);
+              break;
+            }
+          }
+        } else {
+          console.error('createChecklist: No payload or currentBoard');
+        }
+      })
+      .addCase(createChecklist.rejected, (_, action) => {
+        console.error('Failed to create checklist:', action.error.message);
+      })
+      // Create checklist item
+      .addCase(createChecklistItem.fulfilled, (state, action) => {
+        console.log('createChecklistItem.fulfilled payload:', action.payload);
+        
+        if (state.currentBoard && action.payload) {
+          const newItem = action.payload;
+          
+          // Find the checklist and add the item to its items array
+          for (const list of state.currentBoard.lists) {
+            for (const card of list.cards) {
+              const checklistIndex = card.checklists?.findIndex((checklist: any) => checklist.id === newItem.checklistId);
+              if (checklistIndex !== -1) {
+                // Initialize items array if it doesn't exist
+                if (!card.checklists[checklistIndex].items) {
+                  card.checklists[checklistIndex].items = [];
+                }
+                card.checklists[checklistIndex].items.push(newItem);
+                console.log('Checklist item added to checklist in Redux store:', newItem);
+                return;
+              }
+            }
+          }
+        } else {
+          console.error('createChecklistItem: No payload or currentBoard');
+        }
+      })
+      .addCase(createChecklistItem.rejected, (_, action) => {
+        console.error('Failed to create checklist item:', action.error.message);
+      })
+      // Update checklist item
+      .addCase(updateChecklistItem.fulfilled, (state, action) => {
+        console.log('updateChecklistItem.fulfilled payload:', action.payload);
+        
+        if (state.currentBoard && action.payload) {
+          const updatedItem = action.payload;
+          
+          // Find and update the checklist item in the current board
+          for (const list of state.currentBoard.lists) {
+            for (const card of list.cards) {
+              for (const checklist of card.checklists || []) {
+                const itemIndex = checklist.items?.findIndex((item: any) => item.id === updatedItem.id);
+                if (itemIndex !== -1) {
+                  checklist.items[itemIndex] = updatedItem;
+                  console.log('Checklist item updated in Redux store:', updatedItem);
+                  return;
+                }
+              }
+            }
+          }
+        } else {
+          console.error('updateChecklistItem: No payload or currentBoard');
+        }
+      })
+      .addCase(updateChecklistItem.rejected, (_, action) => {
+        console.error('Failed to update checklist item:', action.error.message);
+      })
+      // Delete checklist
+      .addCase(deleteChecklist.fulfilled, (state, action) => {
+        console.log('deleteChecklist.fulfilled payload:', action.payload);
+        
+        if (state.currentBoard && action.payload) {
+          const deletedChecklistId = action.payload;
+          
+          // Find and remove the checklist from the current board
+          for (const list of state.currentBoard.lists) {
+            for (const card of list.cards) {
+              const checklistIndex = card.checklists?.findIndex((checklist: any) => checklist.id === deletedChecklistId);
+              if (checklistIndex !== -1) {
+                card.checklists.splice(checklistIndex, 1);
+                console.log('Checklist deleted from Redux store:', deletedChecklistId);
+                return;
+              }
+            }
+          }
+        } else {
+          console.error('deleteChecklist: No payload or currentBoard');
+        }
+      })
+      .addCase(deleteChecklist.rejected, (_, action) => {
+        console.error('Failed to delete checklist:', action.error.message);
+      })
+      // Delete checklist item
+      .addCase(deleteChecklistItem.fulfilled, (state, action) => {
+        console.log('deleteChecklistItem.fulfilled payload:', action.payload);
+        
+        if (state.currentBoard && action.payload) {
+          const deletedItemId = action.payload;
+          
+          // Find and remove the checklist item from the current board
+          for (const list of state.currentBoard.lists) {
+            for (const card of list.cards) {
+              for (const checklist of card.checklists || []) {
+                const itemIndex = checklist.items?.findIndex((item: any) => item.id === deletedItemId);
+                if (itemIndex !== -1) {
+                  checklist.items.splice(itemIndex, 1);
+                  console.log('Checklist item deleted from Redux store:', deletedItemId);
+                  return;
+                }
+              }
+            }
+          }
+        } else {
+          console.error('deleteChecklistItem: No payload or currentBoard');
+        }
+      })
+      .addCase(deleteChecklistItem.rejected, (_, action) => {
+        console.error('Failed to delete checklist item:', action.error.message);
       })
   },
 })
