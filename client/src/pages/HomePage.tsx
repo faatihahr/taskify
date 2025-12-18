@@ -6,7 +6,7 @@ import Footer from '../components/layouts/footer'
 
 const HomePage: React.FC = () => {
   return (
-    <div className="dark bg-auth-gradient min-h-screen flex flex-col relative overflow-hidden">
+    <div className="bg-auth-gradient min-h-screen flex flex-col relative overflow-hidden">
       <Header />
       {/* Animated Background Elements */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">

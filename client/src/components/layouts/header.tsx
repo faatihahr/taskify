@@ -4,15 +4,11 @@ import { Moon, Sun, Menu, X, LogOut } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '../../store/hooks'
 import { logout } from '../../store/authSlice'
 import { Link, useNavigate } from 'react-router-dom'
+import { useTheme } from '../../contexts/ThemeContext'
 
 const Header: React.FC = () => {
-  const [isDark, setIsDark] = useState(false)
+  const { theme, toggleTheme } = useTheme()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-
-  const toggleTheme = () => {
-    setIsDark(!isDark)
-    document.documentElement.classList.toggle('dark')
-  }
 
   const toggleMobileMenu = () => {
     setMobileMenuOpen(!mobileMenuOpen)
@@ -36,7 +32,7 @@ const Header: React.FC = () => {
             <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg gradient-purple flex items-center justify-center transform group-hover:scale-110 transition-transform">
               <span className="text-white font-bold text-lg md:text-xl">T</span>
             </div>
-            <span className="text-xl md:text-2xl font-bold bg-linear-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+            <span className="text-xl md:text-2xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
               Taskify
             </span>
           </a>
@@ -71,7 +67,7 @@ const Header: React.FC = () => {
               onClick={toggleTheme}
               className="rounded-full"
             >
-              {isDark ? (
+              {theme === 'dark' ? (
                 <Sun className="h-5 w-5" />
               ) : (
                 <Moon className="h-5 w-5" />
@@ -105,7 +101,7 @@ const Header: React.FC = () => {
               onClick={toggleTheme}
               className="rounded-full"
             >
-              {isDark ? (
+              {theme === 'dark' ? (
                 <Sun className="h-5 w-5" />
               ) : (
                 <Moon className="h-5 w-5" />

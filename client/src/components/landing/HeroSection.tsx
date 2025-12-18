@@ -24,7 +24,7 @@ const HeroSection: React.FC = () => {
           {/* Main Heading */}
           <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-foreground mb-6 leading-tight">
             Simplify Your
-            <span className="bg-linear-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent"> Workflow</span>
+            <span className="bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent"> Workflow</span>
           </h1>
 
           {/* Subtitle */}
@@ -70,7 +70,7 @@ const HeroSection: React.FC = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* To Do Column */}
-                <div className="bg-linear-to-br from-primary/10 to-primary/5 rounded-xl p-5 border border-primary/20 hover:border-primary/40 transition-colors">
+                <div className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl p-5 border border-primary/20 hover:border-primary/40 transition-colors">
                   <div className="flex items-center justify-between mb-3">
                     <div className="font-bold text-primary text-lg">To Do</div>
                     <div className="px-3 py-1 rounded-full bg-primary/20 text-primary text-sm font-semibold">
@@ -88,7 +88,7 @@ const HeroSection: React.FC = () => {
                 </div>
 
                 {/* In Progress Column */}
-                <div className="bg-linear-to-br from-yellow-100/30 to-yellow-50/20 dark:from-yellow-500/10 dark:to-yellow-400/5 rounded-xl p-5 border border-yellow-300/30 dark:border-yellow-400/20 hover:border-yellow-400/50 transition-colors">
+                <div className="bg-gradient-to-br from-yellow-100/30 to-yellow-50/20 dark:from-yellow-500/10 dark:to-yellow-400/5 rounded-xl p-5 border border-yellow-300/30 dark:border-yellow-400/20 hover:border-yellow-400/50 transition-colors">
                   <div className="flex items-center justify-between mb-3">
                     <div className="font-bold text-yellow-700 dark:text-yellow-400 text-lg">In Progress</div>
                     <div className="px-3 py-1 rounded-full bg-yellow-200/50 dark:bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 text-sm font-semibold">
@@ -103,7 +103,7 @@ const HeroSection: React.FC = () => {
                 </div>
 
                 {/* Done Column */}
-                <div className="bg-linear-to-br from-green-100/30 to-green-50/20 dark:from-green-500/10 dark:to-green-400/5 rounded-xl p-5 border border-green-300/30 dark:border-green-400/20 hover:border-green-400/50 transition-colors">
+                <div className="bg-gradient-to-br from-green-100/30 to-green-50/20 dark:from-green-500/10 dark:to-green-400/5 rounded-xl p-5 border border-green-300/30 dark:border-green-400/20 hover:border-green-400/50 transition-colors">
                   <div className="flex items-center justify-between mb-3">
                     <div className="font-bold text-green-700 dark:text-green-400 text-lg">Done</div>
                     <div className="px-3 py-1 rounded-full bg-green-200/50 dark:bg-green-500/20 text-green-700 dark:text-green-400 text-sm font-semibold">

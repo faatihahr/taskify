@@ -1,24 +1,13 @@
-import { Router } from 'express';
-import { authenticate } from '../middlewares/auth';
-import { validate } from '../middlewares/validation';
-import { 
-  createListSchema, 
-  updateListSchema, 
-  moveListSchema 
-} from '../validation/list_joi';
-import {
-  createList,
-  getBoardLists,
-  updateList,
-  moveList,
-  deleteList
-} from '../controllers/list';
-
-const router = Router();
-
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const auth_1 = require("../middlewares/auth");
+const validation_1 = require("../middlewares/validation");
+const list_joi_1 = require("../validation/list_joi");
+const list_1 = require("../controllers/list");
+const router = (0, express_1.Router)();
 // All list routes require authentication
-router.use(authenticate);
-
+router.use(auth_1.authenticate);
 /**
  * @swagger
  * components:
@@ -60,7 +49,7 @@ router.use(authenticate);
  *           type: array
  *           items:
  *             $ref: '#/components/schemas/Card'
- *     
+ *
  *     CreateListInput:
  *       type: object
  *       required:
@@ -76,7 +65,7 @@ router.use(authenticate);
  *           minimum: 0
  *           nullable: true
  *           example: 0
- *     
+ *
  *     UpdateListInput:
  *       type: object
  *       required:
@@ -87,7 +76,7 @@ router.use(authenticate);
  *           minLength: 1
  *           maxLength: 255
  *           example: "In Progress"
- *     
+ *
  *     MoveListInput:
  *       type: object
  *       required:
@@ -98,7 +87,6 @@ router.use(authenticate);
  *           minimum: 0
  *           example: 1
  */
-
 /**
  * @swagger
  * /api/boards/{boardId}/lists:
@@ -158,8 +146,7 @@ router.use(authenticate);
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post('/boards/:boardId/lists', validate(createListSchema), createList);
-
+router.post('/boards/:boardId/lists', (0, validation_1.validate)(list_joi_1.createListSchema), list_1.createList);
 /**
  * @swagger
  * /api/boards/{boardId}/lists:
@@ -209,8 +196,7 @@ router.post('/boards/:boardId/lists', validate(createListSchema), createList);
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.get('/boards/:boardId/lists', getBoardLists);
-
+router.get('/boards/:boardId/lists', list_1.getBoardLists);
 /**
  * @swagger
  * /api/lists/{id}:
@@ -270,8 +256,7 @@ router.get('/boards/:boardId/lists', getBoardLists);
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.put('/lists/:id', validate(updateListSchema), updateList);
-
+router.put('/lists/:id', (0, validation_1.validate)(list_joi_1.updateListSchema), list_1.updateList);
 /**
  * @swagger
  * /api/lists/{id}/move:
@@ -331,14 +316,12 @@ router.put('/lists/:id', validate(updateListSchema), updateList);
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.put('/lists/:id/move', validate(moveListSchema), moveList);
-
+router.put('/lists/:id/move', (0, validation_1.validate)(list_joi_1.moveListSchema), list_1.moveList);
 // Test endpoint for debugging
 router.put('/lists/:id/move/test', (req, res) => {
-  console.log('Test move list endpoint hit');
-  res.json({ message: 'Test move endpoint working', params: req.params, body: req.body });
+    console.log('Test move list endpoint hit');
+    res.json({ message: 'Test move endpoint working', params: req.params, body: req.body });
 });
-
 /**
  * @swagger
  * /api/lists/{id}:
@@ -396,6 +379,5 @@ router.put('/lists/:id/move/test', (req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.delete('/lists/:id', deleteList);
-
-export default router;
+router.delete('/lists/:id', list_1.deleteList);
+exports.default = router;

@@ -117,34 +117,31 @@ const CreateCardModal: React.FC<CreateCardModalProps> = ({ isOpen, onClose, list
     }
   };
 
-  const handleCoverImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCoverImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      // Validate file type
-      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-      if (!allowedTypes.includes(file.type)) {
-        alert('Invalid file type. Please select a JPEG, PNG, GIF, or WebP image.');
-        return;
-      }
-
-      // Validate file size (5MB)
+    if (file && file.type.startsWith('image/')) {
+      // Check file size first
       if (file.size > 5 * 1024 * 1024) {
         alert('File size too large. Please select an image smaller than 5MB.');
         return;
       }
 
       setCoverImage(file);
-      const preview = URL.createObjectURL(file);
-      setCoverImagePreview(preview);
+      
+      // Convert image to base64 for persistence
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        setCoverImagePreview(base64String);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
   const handleRemoveCoverImage = () => {
     setCoverImage(null);
-    if (coverImagePreview) {
-      URL.revokeObjectURL(coverImagePreview);
-      setCoverImagePreview('');
-    }
+    // For base64 strings, we don't need to revoke URLs
+    setCoverImagePreview('');
     if (coverImageInputRef.current) {
       coverImageInputRef.current.value = '';
     }
@@ -243,7 +240,7 @@ const CreateCardModal: React.FC<CreateCardModalProps> = ({ isOpen, onClose, list
                       ref={coverImageInputRef}
                       type="file"
                       accept="image/jpeg,image/png,image/gif,image/webp"
-                      onChange={handleCoverImageSelect}
+                      onChange={handleCoverImageChange}
                       className="hidden"
                     />
                     <Button

@@ -52,7 +52,7 @@ const FeaturesSection: React.FC = () => {
           </div>
           <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold text-foreground mb-6">
             Everything You Need to
-            <span className="bg-linear-to-r from-primary to-primary/60 bg-clip-text text-transparent"> Succeed</span>
+            <span className="bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent"> Succeed</span>
           </h2>
           <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
             Powerful features designed to help teams organize, collaborate, and deliver projects faster than ever before.
@@ -67,7 +67,7 @@ const FeaturesSection: React.FC = () => {
               className="group hover:shadow-xl hover:shadow-primary/5 hover:-translate-y-1 transition-all duration-300 border-2 hover:border-primary/30"
             >
               <CardHeader className="text-center">
-                <div className={`mx-auto mb-4 p-4 bg-linear-to-br from-primary/10 to-primary/5 rounded-2xl w-fit group-hover:scale-110 transition-transform ${feature.color}`}>
+                <div className={`mx-auto mb-4 p-4 bg-gradient-to-br from-primary/10 to-primary/5 rounded-2xl w-fit group-hover:scale-110 transition-transform ${feature.color}`}>
                   {feature.icon}
                 </div>
                 <CardTitle className="text-xl md:text-2xl">{feature.title}</CardTitle>
@@ -85,7 +85,7 @@ const FeaturesSection: React.FC = () => {
         <div className="glass-effect rounded-2xl p-8 md:p-12">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 text-center">
             <div className="space-y-2">
-              <div className="text-3xl md:text-5xl font-bold bg-linear-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+              <div className="text-3xl md:text-5xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
                 10k+
               </div>
               <div className="text-sm md:text-base text-muted-foreground font-medium">
@@ -93,7 +93,7 @@ const FeaturesSection: React.FC = () => {
               </div>
             </div>
             <div className="space-y-2">
-              <div className="text-3xl md:text-5xl font-bold bg-linear-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+              <div className="text-3xl md:text-5xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
                 50k+
               </div>
               <div className="text-sm md:text-base text-muted-foreground font-medium">
@@ -101,7 +101,7 @@ const FeaturesSection: React.FC = () => {
               </div>
             </div>
             <div className="space-y-2">
-              <div className="text-3xl md:text-5xl font-bold bg-linear-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+              <div className="text-3xl md:text-5xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
                 500+
               </div>
               <div className="text-sm md:text-base text-muted-foreground font-medium">
@@ -109,7 +109,7 @@ const FeaturesSection: React.FC = () => {
               </div>
             </div>
             <div className="space-y-2">
-              <div className="text-3xl md:text-5xl font-bold bg-linear-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+              <div className="text-3xl md:text-5xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
                 99.9%
               </div>
               <div className="text-sm md:text-base text-muted-foreground font-medium">
