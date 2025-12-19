@@ -165,7 +165,21 @@ export const updateTaskDescription = createAsyncThunk(
   async ({ taskId, description }: { taskId: string; description: string }) => {
     const response = await api.put(`/api/cards/${taskId}`, { description })
     console.log('API response for updateTaskDescription:', response.data);
-    
+
+    if (response.data) {
+      return response.data;
+    } else {
+      throw new Error('No data returned from API');
+    }
+  }
+)
+
+export const updateTaskDueDate = createAsyncThunk(
+  'boards/updateTaskDueDate',
+  async ({ taskId, dueDate }: { taskId: string; dueDate: string | null }) => {
+    const response = await api.put(`/api/cards/${taskId}`, { dueDate })
+    console.log('API response for updateTaskDueDate:', response.data);
+
     if (response.data) {
       return response.data;
     } else {
@@ -490,6 +504,29 @@ const boardsSlice = createSlice({
       })
       .addCase(updateTaskDescription.rejected, (_, action) => {
         console.error('Failed to update task description:', action.error.message);
+      })
+      // Update task due date
+      .addCase(updateTaskDueDate.fulfilled, (state, action) => {
+        console.log('updateTaskDueDate.fulfilled payload:', action.payload);
+
+        if (state.currentBoard && action.payload) {
+          const updatedCard = action.payload;
+
+          // Find and update the card in the current board
+          for (const list of state.currentBoard.lists) {
+            const cardIndex = list.cards.findIndex(card => card.id === updatedCard.id);
+            if (cardIndex !== -1) {
+              list.cards[cardIndex] = updatedCard;
+              console.log('Card due date updated in Redux store:', updatedCard);
+              break;
+            }
+          }
+        } else {
+          console.error('updateTaskDueDate: No payload or currentBoard');
+        }
+      })
+      .addCase(updateTaskDueDate.rejected, (_, action) => {
+        console.error('Failed to update task due date:', action.error.message);
       })
       // Create comment
       .addCase(createComment.fulfilled, (state, action) => {

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useDispatch } from 'react-redux';
 import { useAppSelector } from '../../store/hooks';
-import { updateTaskDescription, createComment, createChecklist, updateCardLabels } from '../../store/boardsSlice';
+import { updateTaskDescription, createComment, createChecklist, updateCardLabels, updateTaskDueDate } from '../../store/boardsSlice';
 import type { AppDispatch } from '../../store';
 import { Button } from '../ui/button';
 import { 
@@ -52,9 +52,10 @@ interface TaskDetailModalProps {
   task: any;
   onCoverImageUpdate: (taskId: string, newCoverImage: string) => void;
   onCommentAdded: (taskId: string) => void;
+  onDueDateUpdate?: (taskId: string, dueDate: string | null) => void;
 }
 
-const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task, onCoverImageUpdate, onCommentAdded }) => {
+const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task, onCoverImageUpdate, onCommentAdded, onDueDateUpdate }) => {
   const dispatch = useDispatch<AppDispatch>();
   const { currentBoard } = useAppSelector((state) => state.boards);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
@@ -69,6 +70,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
   const [headerChecklistTitle, setHeaderChecklistTitle] = useState('');
   const [isLabelPickerOpen, setIsLabelPickerOpen] = useState(false);
   const [currentLabels, setCurrentLabels] = useState(task?.labels || []);
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
 
   // Get comments directly from Redux store
   const comments = useMemo(() => {
@@ -265,6 +267,28 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
               </div>
             )}
 
+            {/* Due Date Display */}
+            {task?.dueDate && (
+              <div className="mb-4">
+                <div className="flex items-center gap-2 text-white/90">
+                  <Calendar className="h-4 w-4" />
+                  <span className="text-sm">
+                    Due: {new Date(task.dueDate).toLocaleDateString('en-US', {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })}
+                  </span>
+                  {new Date(task.dueDate) < new Date() && task.status !== 'Done' && (
+                    <span className="text-xs bg-red-500 text-white px-2 py-1 rounded-full">
+                      Overdue
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Action Buttons */}
             <div className="flex items-center gap-2 flex-wrap">
               <Button variant="ghost" size="sm" className="text-white hover:bg-white/20 border border-white/30 cursor-pointer">
@@ -284,7 +308,13 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
                 <Tag className="h-3 w-3 mr-1" />
                 Labels
               </Button>
-              <Button variant="ghost" size="sm" className="text-white hover:bg-white/20 border border-white/30 cursor-pointer">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsDatePickerOpen(true)}
+                className="text-white hover:bg-white/20 border border-white/30 cursor-pointer transition-all duration-200 hover:scale-105"
+                style={{ pointerEvents: 'auto', zIndex: 20, position: 'relative' }}
+              >
                 <Calendar className="h-3 w-3 mr-1" />
                 Dates
               </Button>
@@ -555,6 +585,140 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
         onLabelsChange={handleLabelsChange}
         currentLabels={currentLabels}
       />
+
+      {/* Date Picker Modal */}
+      <DatePickerModal
+        isOpen={isDatePickerOpen}
+        onClose={() => setIsDatePickerOpen(false)}
+        currentDueDate={task?.dueDate}
+        onDateSelect={async (dateString) => {
+          try {
+            await dispatch(updateTaskDueDate({
+              taskId: task.id,
+              dueDate: dateString
+            }));
+            // Update parent component's selectedTask
+            if (onDueDateUpdate) {
+              onDueDateUpdate(task.id, dateString);
+            }
+            setIsDatePickerOpen(false);
+          } catch (error) {
+            console.error('Failed to update due date:', error);
+          }
+        }}
+        onClearDate={async () => {
+          try {
+            await dispatch(updateTaskDueDate({
+              taskId: task.id,
+              dueDate: null
+            }));
+            // Update parent component's selectedTask
+            if (onDueDateUpdate) {
+              onDueDateUpdate(task.id, null);
+            }
+            setIsDatePickerOpen(false);
+          } catch (error) {
+            console.error('Failed to clear due date:', error);
+          }
+        }}
+      />
+    </div>
+  );
+};
+
+// Date Picker Modal Component
+const DatePickerModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  currentDueDate?: string;
+  onDateSelect: (dateString: string) => void;
+  onClearDate: () => void;
+}> = ({ isOpen, onClose, currentDueDate, onDateSelect, onClearDate }) => {
+  const [selectedDate, setSelectedDate] = useState<string>(
+    currentDueDate ? new Date(currentDueDate).toISOString().split('T')[0] : ''
+  );
+
+  useEffect(() => {
+    if (currentDueDate) {
+      setSelectedDate(new Date(currentDueDate).toISOString().split('T')[0]);
+    } else {
+      setSelectedDate('');
+    }
+  }, [currentDueDate, isOpen]);
+
+  const handleSave = () => {
+    if (selectedDate) {
+      // Convert to ISO string for backend
+      const dateObj = new Date(selectedDate);
+      const isoString = dateObj.toISOString();
+      onDateSelect(isoString);
+    }
+  };
+
+  const handleClear = () => {
+    onClearDate();
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="w-full max-w-md bg-white rounded-xl shadow-2xl overflow-hidden">
+        {/* Header */}
+        <div className="bg-gray-50 border-b border-gray-200 p-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-800">Set Due Date</h2>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {/* Content */}
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Select Date
+            </label>
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              min={new Date().toISOString().split('T')[0]} // Prevent past dates
+            />
+          </div>
+
+          {currentDueDate && (
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+              <p className="text-sm text-blue-800">
+                Current due date: {new Date(currentDueDate).toLocaleDateString()}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="bg-gray-50 border-t border-gray-200 p-4 flex justify-between">
+          <div className="flex gap-2">
+            {currentDueDate && (
+              <Button variant="outline" onClick={handleClear} className="text-red-600 hover:text-red-700">
+                Remove Date
+              </Button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSave}
+              disabled={!selectedDate}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              Save Date
+            </Button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

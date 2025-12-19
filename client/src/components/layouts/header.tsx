@@ -37,27 +37,29 @@ const Header: React.FC = () => {
             </span>
           </a>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-8">
-            <a 
-              href="#features" 
-              className="text-foreground/70 hover:text-primary font-medium transition-colors"
-            >
-              Features
-            </a>
-            <a 
-              href="#pricing" 
-              className="text-foreground/70 hover:text-primary font-medium transition-colors"
-            >
-              Pricing
-            </a>
-            <a 
-              href="#about" 
-              className="text-foreground/70 hover:text-primary font-medium transition-colors"
-            >
-              About
-            </a>
-          </nav>
+          {/* Desktop Navigation - Hidden when logged in */}
+          {!user && (
+            <nav className="hidden md:flex items-center space-x-8">
+              <a
+                href="#features"
+                className="text-foreground/70 hover:text-primary font-medium transition-colors"
+              >
+                Features
+              </a>
+              <a
+                href="#pricing"
+                className="text-foreground/70 hover:text-primary font-medium transition-colors"
+              >
+                Pricing
+              </a>
+              <a
+                href="#about"
+                className="text-foreground/70 hover:text-primary font-medium transition-colors"
+              >
+                About
+              </a>
+            </nav>
+          )}
 
           {/* Desktop Actions */}
           <div className="hidden md:flex items-center space-x-3">
@@ -125,50 +127,52 @@ const Header: React.FC = () => {
         {/* Mobile Menu */}
         {mobileMenuOpen && (
           <div className="md:hidden py-4 animate-fade-in border-t border-border/50">
-            <nav className="flex flex-col space-y-4">
-              <a 
-                href="#features" 
-                className="text-foreground/70 hover:text-primary font-medium transition-colors py-2"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Features
-              </a>
-              <a 
-                href="#pricing" 
-                className="text-foreground/70 hover:text-primary font-medium transition-colors py-2"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Pricing
-              </a>
-              <a 
-                href="#about" 
-                className="text-foreground/70 hover:text-primary font-medium transition-colors py-2"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                About
-              </a>
-              <div className="flex flex-col space-y-2 pt-4">
-                {!user ? (
-                  <>
-                    <Button asChild variant="outline" className="w-full">
-                      <Link to="/login">Login</Link>
+            {!user && (
+              <nav className="flex flex-col space-y-4">
+                <a
+                  href="#features"
+                  className="text-foreground/70 hover:text-primary font-medium transition-colors py-2"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Features
+                </a>
+                <a
+                  href="#pricing"
+                  className="text-foreground/70 hover:text-primary font-medium transition-colors py-2"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Pricing
+                </a>
+                <a
+                  href="#about"
+                  className="text-foreground/70 hover:text-primary font-medium transition-colors py-2"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  About
+                </a>
+              </nav>
+            )}
+            <div className="flex flex-col space-y-2 pt-4">
+              {!user ? (
+                <>
+                  <Button asChild variant="outline" className="w-full">
+                    <Link to="/login">Login</Link>
+                  </Button>
+                  <Button asChild className="w-full gradient-purple text-white">
+                    <Link to="/register">Get Started</Link>
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">{user.name}</span>
+                    <Button onClick={() => { setMobileMenuOpen(false); handleLogout(); }} className="ml-2" variant="ghost">
+                      <LogOut className="h-4 w-4" />
                     </Button>
-                    <Button asChild className="w-full gradient-purple text-white">
-                      <Link to="/register">Get Started</Link>
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium">{user.name}</span>
-                      <Button onClick={() => { setMobileMenuOpen(false); handleLogout(); }} className="ml-2" variant="ghost">
-                        <LogOut className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </>
-                )}
-              </div>
-            </nav>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         )}
       </div>

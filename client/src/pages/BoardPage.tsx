@@ -531,6 +531,12 @@ const BoardPage: React.FC = () => {
           isOpen={showTaskDetailModal}
           onCoverImageUpdate={handleCoverImageUpdate}
           onCommentAdded={handleCommentAdded}
+          onDueDateUpdate={(taskId, dueDate) => {
+            // Update selectedTask with new due date
+            if (selectedTask && selectedTask.id === taskId) {
+              setSelectedTask({ ...selectedTask, dueDate });
+            }
+          }}
           onClose={() => {
             setShowTaskDetailModal(false);
             setSelectedTask(null);
