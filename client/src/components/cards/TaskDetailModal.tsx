@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useDispatch } from 'react-redux';
 import { useAppSelector } from '../../store/hooks';
-import { updateTaskDescription, createComment, createChecklist } from '../../store/boardsSlice';
+import { updateTaskDescription, createComment, createChecklist, updateCardLabels } from '../../store/boardsSlice';
 import type { AppDispatch } from '../../store';
 import { Button } from '../ui/button';
 import { 
@@ -21,6 +21,7 @@ import {
   Search
 } from 'lucide-react';
 import ChecklistComponent from '../checklist/Checklist';
+import LabelPicker from '../labels/LabelPicker';
 
 // Utility function to validate and format image URLs
 const validateImageUrl = (imageUrl: string): string => {
@@ -66,6 +67,8 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
   const checklistRef = useRef<HTMLDivElement>(null);
   const [showHeaderAddChecklist, setShowHeaderAddChecklist] = useState(false);
   const [headerChecklistTitle, setHeaderChecklistTitle] = useState('');
+  const [isLabelPickerOpen, setIsLabelPickerOpen] = useState(false);
+  const [currentLabels, setCurrentLabels] = useState(task?.labels || []);
 
   // Get comments directly from Redux store
   const comments = useMemo(() => {
@@ -108,6 +111,10 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
   useEffect(() => {
     setDescription(task?.description || '');
   }, [task?.description]);
+
+  useEffect(() => {
+    setCurrentLabels(task?.labels || []);
+  }, [task?.labels]);
 
   const handleSaveDescription = async () => {
     try {
@@ -164,6 +171,21 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
       } catch (error) {
         console.error('Failed to create checklist from header:', error);
       }
+    }
+  };
+
+  const handleLabelsChange = async (labels: any[]) => {
+    try {
+      // Update local state immediately for better UX
+      setCurrentLabels(labels);
+      
+      // Dispatch action to update labels in backend
+      await dispatch(updateCardLabels({ taskId: task.id, labels }));
+      console.log('Labels updated:', labels);
+    } catch (error) {
+      console.error('Failed to update labels:', error);
+      // Revert on error
+      setCurrentLabels(task?.labels || []);
     }
   };
 
@@ -228,13 +250,37 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
               {task.title}
             </h1>
 
+            {/* Current Labels Display */}
+            {currentLabels.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-4">
+                {currentLabels.map((label: any) => (
+                  <div
+                    key={label.id}
+                    className="px-2 py-1 rounded-full text-white text-xs font-medium"
+                    style={{ backgroundColor: label.color }}
+                  >
+                    {label.name}
+                  </div>
+                ))}
+              </div>
+            )}
+
             {/* Action Buttons */}
             <div className="flex items-center gap-2 flex-wrap">
               <Button variant="ghost" size="sm" className="text-white hover:bg-white/20 border border-white/30 cursor-pointer">
                 <Plus className="h-3 w-3 mr-1" />
                 Add
               </Button>
-              <Button variant="ghost" size="sm" className="text-white hover:bg-white/20 border border-white/30 cursor-pointer">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => {
+                  console.log('Labels button clicked!');
+                  setIsLabelPickerOpen(true);
+                }}
+                className="text-white hover:bg-white/20 border border-white/30 cursor-pointer transition-all duration-200 hover:scale-105"
+                style={{ pointerEvents: 'auto', zIndex: 20, position: 'relative' }}
+              >
                 <Tag className="h-3 w-3 mr-1" />
                 Labels
               </Button>
@@ -500,6 +546,14 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
         isOpen={isCoverImageModalOpen}
         onClose={() => setIsCoverImageModalOpen(false)}
         onCoverImageUpdate={handleCoverImageUpdate}
+      />
+
+      {/* Label Picker Modal */}
+      <LabelPicker
+        isOpen={isLabelPickerOpen}
+        onClose={() => setIsLabelPickerOpen(false)}
+        onLabelsChange={handleLabelsChange}
+        currentLabels={currentLabels}
       />
     </div>
   );

@@ -25,8 +25,19 @@ const initialState: AuthState = {
 export const loginUser = createAsyncThunk(
   'auth/login',
   async (credentials: { email: string; password: string }) => {
-    const response = await api.post('/api/auth/login', credentials)
-    const data = response.data
+    // Debug: print which baseURL / env the client is using
+    try {
+      // eslint-disable-next-line no-console
+      console.log('auth/login thunk - axios baseURL =', (api as any).defaults?.baseURL)
+      // eslint-disable-next-line no-console
+      console.log('auth/login thunk - VITE_API_URL =', import.meta.env.VITE_API_URL)
+    } catch (e) {
+      // ignore
+    }
+
+    try {
+      const response = await api.post('/api/auth/login', credentials)
+      const data = response.data
     // backend returns { message, user_id, name, email, token, ... }
     // normalize to { id, name, email, token }
     const user = {
@@ -38,6 +49,11 @@ export const loginUser = createAsyncThunk(
     // set default header immediately (will also be persisted in extraReducers)
     if (user.token) setAuthToken(user.token)
     return user
+    } catch (err: any) {
+      // axios error handling
+      const msg = err?.response?.data?.message || err?.message || 'Login failed'
+      throw new Error(msg)
+    }
   }
 )
 

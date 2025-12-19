@@ -19,7 +19,9 @@ import {
   createChecklistItem,
   updateChecklistItem,
   deleteChecklist,
-  deleteChecklistItem
+  deleteChecklistItem,
+  updateCardLabels,
+  getAllLabels
 } from '../controllers/card';
 
 const router = Router();
@@ -629,6 +631,10 @@ router.post('/checklists/:checklistId/items', createChecklistItem);
 router.put('/checklists/items/:itemId', updateChecklistItem);
 router.delete('/checklists/:checklistId', deleteChecklist);
 router.delete('/checklists/items/:itemId', deleteChecklistItem);
+
+// Label routes
+router.put('/:id/labels', updateCardLabels);
+router.get('/labels/all', getAllLabels);
 
 // Test endpoint for debugging
 router.post('/:id/comments/test', (req, res) => {

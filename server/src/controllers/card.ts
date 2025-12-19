@@ -1045,7 +1045,7 @@ export const createChecklist = async (req: AuthenticatedRequest, res: Response) 
 export const createChecklistItem = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { checklistId } = req.params;
-    const { title } = req.body;
+    const { title, description } = req.body;
     const userId = req.user?.id;
 
     if (!userId) {
@@ -1099,6 +1099,7 @@ export const createChecklistItem = async (req: AuthenticatedRequest, res: Respon
     const item = await prisma.checklistItem.create({
       data: {
         title: title.trim(),
+        description: description?.trim() || null,
         checklistId,
         position
       }
@@ -1280,6 +1281,191 @@ export const deleteChecklistItem = async (req: AuthenticatedRequest, res: Respon
     res.json({ message: 'Checklist item deleted successfully' });
   } catch (error) {
     console.error('Delete checklist item error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Label management functions
+export const updateCardLabels = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id: cardId } = req.params;
+    const { labels } = req.body; // Array of label objects with id, name, and color
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    if (!Array.isArray(labels)) {
+      return res.status(400).json({ error: 'Labels must be an array' });
+    }
+
+    // Check if card exists and user has access
+    const card = await prisma.card.findUnique({
+      where: { id: cardId },
+      include: {
+        list: {
+          include: {
+            board: {
+              include: {
+                members: {
+                  where: { userId }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!card) {
+      return res.status(404).json({ error: 'Card not found' });
+    }
+
+    const isOwner = card.list.board.ownerId === userId;
+    const isMember = card.list.board.members.length > 0;
+
+    if (!isOwner && !isMember) {
+      return res.status(403).json({ error: 'Not authorized to update labels on this card' });
+    }
+
+    // Use a transaction to update labels
+    await prisma.$transaction(async (tx) => {
+      // Remove all existing label associations for this card
+      await tx.card.update({
+        where: { id: cardId },
+        data: {
+          labels: {
+            set: [] // Disconnect all existing labels
+          }
+        }
+      });
+
+      // If new labels are provided, connect them
+      if (labels.length > 0) {
+        for (const labelData of labels) {
+          // Find or create the label
+          let label = await tx.label.findUnique({
+            where: { id: labelData.id }
+          });
+
+          if (!label) {
+            // Create new label if it doesn't exist
+            label = await tx.label.create({
+              data: {
+                id: labelData.id,
+                name: labelData.name,
+                color: labelData.color
+              }
+            });
+          } else {
+            // Update existing label if name or color changed
+            label = await tx.label.update({
+              where: { id: labelData.id },
+              data: {
+                name: labelData.name,
+                color: labelData.color
+              }
+            });
+          }
+
+          // Connect the label to the card
+          await tx.card.update({
+            where: { id: cardId },
+            data: {
+              labels: {
+                connect: { id: label.id }
+              }
+            }
+          });
+        }
+      }
+    });
+
+    // Fetch updated card with all relationships
+    const updatedCard = await prisma.card.findUnique({
+      where: { id: cardId },
+      include: {
+        labels: true,
+        list: {
+          include: {
+            board: true
+          }
+        },
+        creator: {
+          select: { id: true, name: true, email: true }
+        },
+        attachments: true,
+        comments: {
+          include: {
+            user: {
+              select: { id: true, name: true, email: true }
+            }
+          }
+        },
+        checklists: {
+          include: {
+            items: {
+              orderBy: { position: 'asc' }
+            }
+          }
+        }
+      }
+    });
+
+    // Create activity
+    await prisma.activity.create({
+      data: {
+        action: 'labels_updated',
+        details: JSON.stringify({ labelCount: labels.length }),
+        boardId: card.list.board.id,
+        cardId: card.id,
+        userId
+      }
+    });
+
+    res.json({ card: updatedCard });
+  } catch (error) {
+    console.error('Update card labels error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const getAllLabels = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    // Get all unique labels used in boards where the user is a member or owner
+    const labels = await prisma.label.findMany({
+      where: {
+        cards: {
+          some: {
+            list: {
+              board: {
+                OR: [
+                  { ownerId: userId },
+                  {
+                    members: {
+                      some: { userId }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      distinct: ['id'],
+      orderBy: { name: 'asc' }
+    });
+
+    res.json({ labels });
+  } catch (error) {
+    console.error('Get all labels error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

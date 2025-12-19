@@ -203,8 +203,8 @@ export const createChecklist = createAsyncThunk(
 
 export const createChecklistItem = createAsyncThunk(
   'boards/createChecklistItem',
-  async ({ checklistId, title }: { checklistId: string; title: string }) => {
-    const response = await api.post(`/api/cards/checklists/${checklistId}/items`, { title })
+  async ({ checklistId, title, description }: { checklistId: string; title: string; description?: string }) => {
+    const response = await api.post(`/api/cards/checklists/${checklistId}/items`, { title, description })
     console.log('API response for createChecklistItem:', response.data);
     
     if (response.data.item) {
@@ -242,6 +242,20 @@ export const deleteChecklistItem = createAsyncThunk(
   async ({ itemId }: { itemId: string }) => {
     await api.delete(`/api/cards/checklists/items/${itemId}`)
     return itemId;
+  }
+)
+
+export const updateCardLabels = createAsyncThunk(
+  'boards/updateCardLabels',
+  async ({ taskId, labels }: { taskId: string; labels: any[] }) => {
+    const response = await api.put(`/api/cards/${taskId}/labels`, { labels })
+    console.log('API response for updateCardLabels:', response.data);
+    
+    if (response.data.card) {
+      return response.data.card;
+    } else {
+      throw new Error('No card data returned from API');
+    }
   }
 )
 
@@ -624,6 +638,29 @@ const boardsSlice = createSlice({
       })
       .addCase(deleteChecklistItem.rejected, (_, action) => {
         console.error('Failed to delete checklist item:', action.error.message);
+      })
+      // Update card labels
+      .addCase(updateCardLabels.fulfilled, (state, action) => {
+        console.log('updateCardLabels.fulfilled payload:', action.payload);
+        
+        if (state.currentBoard && action.payload) {
+          const updatedCard = action.payload;
+          
+          // Find and update the card in the current board
+          for (const list of state.currentBoard.lists) {
+            const cardIndex = list.cards.findIndex(card => card.id === updatedCard.id);
+            if (cardIndex !== -1) {
+              list.cards[cardIndex] = updatedCard;
+              console.log('Card labels updated in Redux store:', updatedCard);
+              break;
+            }
+          }
+        } else {
+          console.error('updateCardLabels: No payload or currentBoard');
+        }
+      })
+      .addCase(updateCardLabels.rejected, (_, action) => {
+        console.error('Failed to update card labels:', action.error.message);
       })
   },
 })

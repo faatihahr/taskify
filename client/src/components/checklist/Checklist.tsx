@@ -14,6 +14,7 @@ import type { AppDispatch } from '../../store';
 interface ChecklistItem {
   id: string;
   title: string;
+  description?: string;
   completed: boolean;
   position: number;
 }
@@ -35,6 +36,7 @@ const ChecklistComponent: React.FC<ChecklistProps> = ({ cardId, checklists }) =>
   const [newChecklistTitle, setNewChecklistTitle] = useState('');
   const [showAddChecklist, setShowAddChecklist] = useState(false);
   const [newItemTitles, setNewItemTitles] = useState<{ [key: string]: string }>({});
+  const [newItemDescriptions, setNewItemDescriptions] = useState<{ [key: string]: string }>({});
   const [editMode, setEditMode] = useState(false); // New state for edit mode
 
   const handleCreateChecklist = async () => {
@@ -58,10 +60,16 @@ const ChecklistComponent: React.FC<ChecklistProps> = ({ cardId, checklists }) =>
 
   const handleCreateChecklistItem = async (checklistId: string) => {
     const title = newItemTitles[checklistId];
+    const description = newItemDescriptions[checklistId];
     if (title?.trim()) {
       try {
-        await dispatch(createChecklistItem({ checklistId, title: title.trim() })).unwrap();
+        await dispatch(createChecklistItem({ 
+          checklistId, 
+          title: title.trim(),
+          description: description?.trim() || undefined
+        })).unwrap();
         setNewItemTitles(prev => ({ ...prev, [checklistId]: '' }));
+        setNewItemDescriptions(prev => ({ ...prev, [checklistId]: '' }));
       } catch (error) {
         console.error('Failed to create checklist item:', error);
       }
@@ -184,15 +192,28 @@ const ChecklistComponent: React.FC<ChecklistProps> = ({ cardId, checklists }) =>
                     onChange={(e) => handleToggleItem(item.id, e.target.checked)}
                     className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500"
                   />
-                  <span
-                    className={`flex-1 text-sm ${
-                      item.completed
-                        ? 'text-gray-500 line-through'
-                        : 'text-gray-700'
-                    }`}
-                  >
-                    {item.title}
-                  </span>
+                  <div className="flex-1">
+                    <span
+                      className={`text-sm block ${
+                        item.completed
+                          ? 'text-gray-500 line-through'
+                          : 'text-gray-700'
+                      }`}
+                    >
+                      {item.title}
+                    </span>
+                    {item.description && (
+                      <span
+                        className={`text-xs block mt-1 ${
+                          item.completed
+                            ? 'text-gray-400 line-through'
+                            : 'text-gray-500'
+                        }`}
+                      >
+                        {item.description}
+                      </span>
+                    )}
+                  </div>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -207,34 +228,72 @@ const ChecklistComponent: React.FC<ChecklistProps> = ({ cardId, checklists }) =>
 
             {/* Add Item Input - only show in edit mode */}
             {editMode && (
-              <div className="flex gap-2">
-                <input
-                  id={`add-item-${checklist.id}`}
-                  type="text"
-                  value={newItemTitles[checklist.id] || ''}
-                  onChange={(e) =>
-                    setNewItemTitles(prev => ({
-                      ...prev,
-                      [checklist.id]: e.target.value
-                    }))
-                  }
-                  placeholder="Add an item..."
-                  className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
-                      handleCreateChecklistItem(checklist.id);
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Item Title</label>
+                  <input
+                    id={`add-item-${checklist.id}`}
+                    type="text"
+                    value={newItemTitles[checklist.id] || ''}
+                    onChange={(e) =>
+                      setNewItemTitles(prev => ({
+                        ...prev,
+                        [checklist.id]: e.target.value
+                      }))
                     }
-                  }}
-                  autoFocus
-                />
-                <Button
-                  size="sm"
-                  onClick={() => handleCreateChecklistItem(checklist.id)}
-                  disabled={!newItemTitles[checklist.id]?.trim()}
-                  className="px-3 py-2"
-                >
-                  Add
-                </Button>
+                    placeholder="Add an item..."
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleCreateChecklistItem(checklist.id);
+                      }
+                    }}
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Description</label>
+                  <textarea
+                    value={newItemDescriptions[checklist.id] || ''}
+                    onChange={(e) =>
+                      setNewItemDescriptions(prev => ({
+                        ...prev,
+                        [checklist.id]: e.target.value
+                      }))
+                    }
+                    placeholder="Add description (optional)..."
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                    rows={2}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && e.shiftKey) {
+                        e.preventDefault();
+                        handleCreateChecklistItem(checklist.id);
+                      }
+                    }}
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => handleCreateChecklistItem(checklist.id)}
+                    disabled={!newItemTitles[checklist.id]?.trim()}
+                    className="flex-1"
+                  >
+                    Save Item
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setNewItemTitles(prev => ({ ...prev, [checklist.id]: '' }));
+                      setNewItemDescriptions(prev => ({ ...prev, [checklist.id]: '' }));
+                    }}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                </div>
               </div>
             )}
           </div>

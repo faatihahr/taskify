@@ -165,11 +165,12 @@ model Checklist {
 }
 
 model ChecklistItem {
-  id        String   @id @default(cuid())
-  title     String
-  completed Boolean  @default(false)
-  position  Int
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  title       String
+  description String?  // Optional description for checklist item
+  completed   Boolean  @default(false)
+  position    Int
+  createdAt   DateTime @default(now())
 
   checklistId String
   checklist   Checklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)

@@ -122,9 +122,30 @@ const TaskCard: React.FC<{ task: any; index: number; onClick: () => void }> = ({
 
             {/* Priority indicator */}
             <div className="flex items-center justify-between mt-2 sm:mt-3">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-primary rounded-full"></div>
-                <span className="text-xs text-muted-foreground hidden sm:inline">Task</span>
+                
+                {/* Label Badges */}
+                {task.labels && task.labels.length > 0 && (
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {task.labels.slice(0, 3).map((label: any) => (
+                      <div
+                        key={label.id}
+                        className="px-1.5 py-0.5 rounded text-xs font-medium text-white"
+                        style={{ backgroundColor: label.color }}
+                        title={label.name}
+                      >
+                        {label.name.length > 8 ? label.name.substring(0, 8) + '...' : label.name}
+                      </div>
+                    ))}
+                    {task.labels.length > 3 && (
+                      <div className="px-1.5 py-0.5 rounded text-xs font-medium bg-gray-200 text-gray-600">
+                        +{task.labels.length - 3}
+                      </div>
+                    )}
+                  </div>
+                )}
+                
                 {/* Checklist Badge */}
                 {checklistCompletion && (
                   <div 
@@ -139,10 +160,6 @@ const TaskCard: React.FC<{ task: any; index: number; onClick: () => void }> = ({
                     {checklistCompletion.percentage}%
                   </div>
                 )}
-              </div>
-              <div className="flex items-center gap-1 text-muted-foreground">
-                <div className="w-0.5 h-2 sm:w-1 sm:h-3 bg-muted-foreground rounded-full"></div>
-                <div className="w-0.5 h-2 sm:w-1 sm:h-3 bg-muted-foreground rounded-full"></div>
               </div>
             </div>
           </div>
