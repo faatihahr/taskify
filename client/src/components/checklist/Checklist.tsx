@@ -2,12 +2,13 @@ import React, { useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { CheckSquare, Plus, X, Trash2, Edit } from 'lucide-react';
 import { Button } from '../ui/button';
-import { 
-  createChecklist, 
-  createChecklistItem, 
-  updateChecklistItem, 
-  deleteChecklist, 
-  deleteChecklistItem 
+import {
+  createChecklist,
+  createChecklistItem,
+  updateChecklistItem,
+  updateChecklist,
+  deleteChecklist,
+  deleteChecklistItem
 } from '../../store/boardsSlice';
 import type { AppDispatch } from '../../store';
 
@@ -22,6 +23,7 @@ interface ChecklistItem {
 interface Checklist {
   id: string;
   title: string;
+  description?: string;
   position: number;
   items: ChecklistItem[];
 }
@@ -36,8 +38,9 @@ const ChecklistComponent: React.FC<ChecklistProps> = ({ cardId, checklists }) =>
   const [newChecklistTitle, setNewChecklistTitle] = useState('');
   const [showAddChecklist, setShowAddChecklist] = useState(false);
   const [newItemTitles, setNewItemTitles] = useState<{ [key: string]: string }>({});
-  const [newItemDescriptions, setNewItemDescriptions] = useState<{ [key: string]: string }>({});
   const [editMode, setEditMode] = useState(false); // New state for edit mode
+  const [editingChecklistDescription, setEditingChecklistDescription] = useState<{ [key: string]: boolean }>({});
+  const [checklistDescriptions, setChecklistDescriptions] = useState<{ [key: string]: string }>({});
 
   const handleCreateChecklist = async () => {
     console.log('handleCreateChecklist called with title:', newChecklistTitle);
@@ -60,16 +63,13 @@ const ChecklistComponent: React.FC<ChecklistProps> = ({ cardId, checklists }) =>
 
   const handleCreateChecklistItem = async (checklistId: string) => {
     const title = newItemTitles[checklistId];
-    const description = newItemDescriptions[checklistId];
     if (title?.trim()) {
       try {
-        await dispatch(createChecklistItem({ 
-          checklistId, 
-          title: title.trim(),
-          description: description?.trim() || undefined
+        await dispatch(createChecklistItem({
+          checklistId,
+          title: title.trim()
         })).unwrap();
         setNewItemTitles(prev => ({ ...prev, [checklistId]: '' }));
-        setNewItemDescriptions(prev => ({ ...prev, [checklistId]: '' }));
       } catch (error) {
         console.error('Failed to create checklist item:', error);
       }
@@ -97,6 +97,19 @@ const ChecklistComponent: React.FC<ChecklistProps> = ({ cardId, checklists }) =>
       await dispatch(deleteChecklistItem({ itemId })).unwrap();
     } catch (error) {
       console.error('Failed to delete checklist item:', error);
+    }
+  };
+
+  const handleUpdateChecklistDescription = async (checklistId: string) => {
+    const description = checklistDescriptions[checklistId]?.trim() || undefined;
+    try {
+      await dispatch(updateChecklist({
+        checklistId,
+        description
+      })).unwrap();
+      setEditingChecklistDescription(prev => ({ ...prev, [checklistId]: false }));
+    } catch (error) {
+      console.error('Failed to update checklist description:', error);
     }
   };
 
@@ -166,6 +179,84 @@ const ChecklistComponent: React.FC<ChecklistProps> = ({ cardId, checklists }) =>
                 <Trash2 className="h-3 w-3" />
               </Button>
             </div>
+
+            {/* Checklist Description */}
+            {checklist.description && !editingChecklistDescription[checklist.id] && (
+              <div className="mb-3 text-sm text-gray-600 bg-gray-100 p-2 rounded">
+                {checklist.description}
+              </div>
+            )}
+
+            {/* Edit Description Form */}
+            {editMode && editingChecklistDescription[checklist.id] && (
+              <div className="mb-3 space-y-2">
+                <textarea
+                  value={checklistDescriptions[checklist.id] || checklist.description || ''}
+                  onChange={(e) =>
+                    setChecklistDescriptions(prev => ({
+                      ...prev,
+                      [checklist.id]: e.target.value
+                    }))
+                  }
+                  placeholder="Add description..."
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                  rows={3}
+                  autoFocus
+                />
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => handleUpdateChecklistDescription(checklist.id)}
+                    className="px-3 py-1"
+                  >
+                    Save
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setEditingChecklistDescription(prev => ({ ...prev, [checklist.id]: false }));
+                      setChecklistDescriptions(prev => ({ ...prev, [checklist.id]: '' }));
+                    }}
+                    className="px-3 py-1"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Add Description Button (only in edit mode when no description exists) */}
+            {editMode && !checklist.description && !editingChecklistDescription[checklist.id] && (
+              <button
+                onClick={() => {
+                  setEditingChecklistDescription(prev => ({ ...prev, [checklist.id]: true }));
+                  setChecklistDescriptions(prev => ({
+                    ...prev,
+                    [checklist.id]: checklist.description || ''
+                  }));
+                }}
+                className="mb-3 text-sm text-gray-500 hover:text-gray-700 underline"
+              >
+                Add description
+              </button>
+            )}
+
+            {/* Edit Description Button (only in edit mode when description exists) */}
+            {editMode && checklist.description && !editingChecklistDescription[checklist.id] && (
+              <button
+                onClick={() => {
+                  setEditingChecklistDescription(prev => ({ ...prev, [checklist.id]: true }));
+                  setChecklistDescriptions(prev => ({
+                    ...prev,
+                    [checklist.id]: checklist.description || ''
+                  }));
+                }}
+                className="mb-3 text-sm text-gray-500 hover:text-gray-700 underline"
+              >
+                Edit description
+              </button>
+            )}
 
             {/* Progress Bar */}
             {checklist.items.length > 0 && (
@@ -244,33 +335,12 @@ const ChecklistComponent: React.FC<ChecklistProps> = ({ cardId, checklists }) =>
                     placeholder="Add an item..."
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     onKeyPress={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
+                      if (e.key === 'Enter') {
                         e.preventDefault();
                         handleCreateChecklistItem(checklist.id);
                       }
                     }}
                     autoFocus
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Description</label>
-                  <textarea
-                    value={newItemDescriptions[checklist.id] || ''}
-                    onChange={(e) =>
-                      setNewItemDescriptions(prev => ({
-                        ...prev,
-                        [checklist.id]: e.target.value
-                      }))
-                    }
-                    placeholder="Add description (optional)..."
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                    rows={2}
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter' && e.shiftKey) {
-                        e.preventDefault();
-                        handleCreateChecklistItem(checklist.id);
-                      }
-                    }}
                   />
                 </div>
                 <div className="flex gap-2">
@@ -287,7 +357,6 @@ const ChecklistComponent: React.FC<ChecklistProps> = ({ cardId, checklists }) =>
                     variant="outline"
                     onClick={() => {
                       setNewItemTitles(prev => ({ ...prev, [checklist.id]: '' }));
-                      setNewItemDescriptions(prev => ({ ...prev, [checklist.id]: '' }));
                     }}
                     className="flex-1"
                   >

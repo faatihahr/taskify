@@ -237,6 +237,20 @@ export const deleteChecklist = createAsyncThunk(
   }
 )
 
+export const updateChecklist = createAsyncThunk(
+  'boards/updateChecklist',
+  async ({ checklistId, title, description }: { checklistId: string; title?: string; description?: string }) => {
+    const response = await api.put(`/api/cards/checklists/${checklistId}`, { title, description })
+    console.log('API response for updateChecklist:', response.data);
+
+    if (response.data.checklist) {
+      return response.data.checklist;
+    } else {
+      throw new Error('No checklist data returned from API');
+    }
+  }
+)
+
 export const deleteChecklistItem = createAsyncThunk(
   'boards/deleteChecklistItem',
   async ({ itemId }: { itemId: string }) => {
@@ -612,13 +626,38 @@ const boardsSlice = createSlice({
       .addCase(deleteChecklist.rejected, (_, action) => {
         console.error('Failed to delete checklist:', action.error.message);
       })
+      // Update checklist
+      .addCase(updateChecklist.fulfilled, (state, action) => {
+        console.log('updateChecklist.fulfilled payload:', action.payload);
+
+        if (state.currentBoard && action.payload) {
+          const updatedChecklist = action.payload;
+
+          // Find and update the checklist in the current board
+          for (const list of state.currentBoard.lists) {
+            for (const card of list.cards) {
+              const checklistIndex = card.checklists?.findIndex((checklist: any) => checklist.id === updatedChecklist.id);
+              if (checklistIndex !== -1) {
+                card.checklists[checklistIndex] = updatedChecklist;
+                console.log('Checklist updated in Redux store:', updatedChecklist);
+                return;
+              }
+            }
+          }
+        } else {
+          console.error('updateChecklist: No payload or currentBoard');
+        }
+      })
+      .addCase(updateChecklist.rejected, (_, action) => {
+        console.error('Failed to update checklist:', action.error.message);
+      })
       // Delete checklist item
       .addCase(deleteChecklistItem.fulfilled, (state, action) => {
         console.log('deleteChecklistItem.fulfilled payload:', action.payload);
-        
+
         if (state.currentBoard && action.payload) {
           const deletedItemId = action.payload;
-          
+
           // Find and remove the checklist item from the current board
           for (const list of state.currentBoard.lists) {
             for (const card of list.cards) {

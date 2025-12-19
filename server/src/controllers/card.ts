@@ -1175,6 +1175,78 @@ export const updateChecklistItem = async (req: AuthenticatedRequest, res: Respon
   }
 };
 
+export const updateChecklist = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { checklistId } = req.params;
+    const { title, description } = req.body;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    // Check if checklist exists and user has access
+    const checklist = await prisma.checklist.findUnique({
+      where: { id: checklistId },
+      include: {
+        card: {
+          include: {
+            list: {
+              include: {
+                board: {
+                  include: {
+                    members: {
+                      where: { userId }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!checklist) {
+      return res.status(404).json({ error: 'Checklist not found' });
+    }
+
+    const isOwner = checklist.card.list.board.ownerId === userId;
+    const isMember = checklist.card.list.board.members.length > 0;
+
+    if (!isOwner && !isMember) {
+      return res.status(403).json({ error: 'Not authorized to update this checklist' });
+    }
+
+    // Prepare update data
+    const updateData: any = {};
+    if (title !== undefined) {
+      if (!title || title.trim().length === 0) {
+        return res.status(400).json({ error: 'Checklist title cannot be empty' });
+      }
+      updateData.title = title.trim();
+    }
+    if (description !== undefined) {
+      updateData.description = description?.trim() || null;
+    }
+
+    const updatedChecklist = await prisma.checklist.update({
+      where: { id: checklistId },
+      data: updateData,
+      include: {
+        items: {
+          orderBy: { position: 'asc' }
+        }
+      }
+    });
+
+    res.json({ checklist: updatedChecklist });
+  } catch (error) {
+    console.error('Update checklist error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 export const deleteChecklist = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { checklistId } = req.params;

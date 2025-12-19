@@ -18,6 +18,7 @@ import {
   createChecklist,
   createChecklistItem,
   updateChecklistItem,
+  updateChecklist,
   deleteChecklist,
   deleteChecklistItem,
   updateCardLabels,
@@ -627,6 +628,7 @@ router.post('/:id/comments', createComment);
 
 // Checklist routes
 router.post('/:id/checklists', createChecklist);
+router.put('/checklists/:checklistId', updateChecklist);
 router.post('/checklists/:checklistId/items', createChecklistItem);
 router.put('/checklists/items/:itemId', updateChecklistItem);
 router.delete('/checklists/:checklistId', deleteChecklist);

@@ -153,6 +153,7 @@ model Comment {
 model Checklist {
   id        String   @id @default(cuid())
   title     String
+  description String?
   position  Int
   createdAt DateTime @default(now())
 
