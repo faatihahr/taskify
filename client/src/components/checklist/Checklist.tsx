@@ -126,17 +126,17 @@ const ChecklistComponent: React.FC<ChecklistProps> = ({ cardId, checklists }) =>
         const progress = getChecklistProgress(checklist.items);
         
         return (
-          <div key={checklist.id} className="bg-gray-50 rounded-lg p-4">
+          <div key={checklist.id} className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
             {/* Checklist Header */}
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <CheckSquare className="h-4 w-4 text-gray-600" />
-                <h3 className="font-medium text-gray-800">{checklist.title}</h3>
-                <span className="text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded-full">
+                <CheckSquare className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                <h3 className="font-medium text-gray-800 dark:text-gray-200">{checklist.title}</h3>
+                <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded-full">
                   {progress}%
                 </span>
                 {/* DEBUG: Show items count */}
-                <span className="text-xs text-red-500 bg-red-100 px-2 py-1 rounded-full">
+                <span className="text-xs text-red-500 bg-red-100 dark:bg-red-900/20 px-2 py-1 rounded-full">
                   Items: {checklist.items?.length || 0}
                 </span>
                 {/* Edit button - toggle edit mode */}
@@ -147,7 +147,7 @@ const ChecklistComponent: React.FC<ChecklistProps> = ({ cardId, checklists }) =>
                     console.log('Current edit mode:', editMode);
                     setEditMode(!editMode); // Toggle edit mode
                   }}
-                  className={`text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded transition-colors duration-200 ${editMode ? 'bg-blue-100 text-blue-600' : ''}`}
+                  className={`text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 p-1 rounded transition-colors duration-200 ${editMode ? 'bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : ''}`}
                   title={editMode ? "Done editing" : "Add checklist items"}
                 >
                   <Edit className="h-3 w-3" />
@@ -182,7 +182,7 @@ const ChecklistComponent: React.FC<ChecklistProps> = ({ cardId, checklists }) =>
 
             {/* Checklist Description */}
             {checklist.description && !editingChecklistDescription[checklist.id] && (
-              <div className="mb-3 text-sm text-gray-600 bg-gray-100 p-2 rounded">
+              <div className="mb-3 text-sm text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 p-2 rounded">
                 {checklist.description}
               </div>
             )}
@@ -199,7 +199,7 @@ const ChecklistComponent: React.FC<ChecklistProps> = ({ cardId, checklists }) =>
                     }))
                   }
                   placeholder="Add description..."
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                   rows={3}
                   autoFocus
                 />
@@ -236,7 +236,7 @@ const ChecklistComponent: React.FC<ChecklistProps> = ({ cardId, checklists }) =>
                     [checklist.id]: checklist.description || ''
                   }));
                 }}
-                className="mb-3 text-sm text-gray-500 hover:text-gray-700 underline"
+                className="mb-3 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 underline"
               >
                 Add description
               </button>
@@ -252,7 +252,7 @@ const ChecklistComponent: React.FC<ChecklistProps> = ({ cardId, checklists }) =>
                     [checklist.id]: checklist.description || ''
                   }));
                 }}
-                className="mb-3 text-sm text-gray-500 hover:text-gray-700 underline"
+                className="mb-3 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 underline"
               >
                 Edit description
               </button>
@@ -261,7 +261,7 @@ const ChecklistComponent: React.FC<ChecklistProps> = ({ cardId, checklists }) =>
             {/* Progress Bar */}
             {checklist.items.length > 0 && (
               <div className="mb-3">
-                <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                   <div
                     className="bg-green-500 h-2 rounded-full transition-all duration-300"
                     style={{ width: `${progress}%` }}
@@ -275,7 +275,7 @@ const ChecklistComponent: React.FC<ChecklistProps> = ({ cardId, checklists }) =>
               {checklist.items.map((item) => (
                 <div
                   key={item.id}
-                  className="flex items-center gap-2 p-2 bg-white rounded border border-gray-200 hover:border-gray-300 transition-colors"
+                  className="flex items-center gap-2 p-2 bg-white dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500 transition-colors group"
                 >
                   <input
                     type="checkbox"
@@ -287,8 +287,8 @@ const ChecklistComponent: React.FC<ChecklistProps> = ({ cardId, checklists }) =>
                     <span
                       className={`text-sm block ${
                         item.completed
-                          ? 'text-gray-500 line-through'
-                          : 'text-gray-700'
+                          ? 'text-gray-500 dark:text-gray-400 line-through'
+                          : 'text-gray-700 dark:text-gray-300'
                       }`}
                     >
                       {item.title}
@@ -297,8 +297,8 @@ const ChecklistComponent: React.FC<ChecklistProps> = ({ cardId, checklists }) =>
                       <span
                         className={`text-xs block mt-1 ${
                           item.completed
-                            ? 'text-gray-400 line-through'
-                            : 'text-gray-500'
+                            ? 'text-gray-400 dark:text-gray-500 line-through'
+                            : 'text-gray-500 dark:text-gray-400'
                         }`}
                       >
                         {item.description}
@@ -309,7 +309,7 @@ const ChecklistComponent: React.FC<ChecklistProps> = ({ cardId, checklists }) =>
                     variant="ghost"
                     size="sm"
                     onClick={() => handleDeleteChecklistItem(item.id)}
-                    className="text-gray-400 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 opacity-0 group-hover:opacity-100 transition-opacity"
                   >
                     <X className="h-3 w-3" />
                   </Button>
@@ -321,7 +321,7 @@ const ChecklistComponent: React.FC<ChecklistProps> = ({ cardId, checklists }) =>
             {editMode && (
               <div className="space-y-3">
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Item Title</label>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Item Title</label>
                   <input
                     id={`add-item-${checklist.id}`}
                     type="text"
@@ -333,7 +333,7 @@ const ChecklistComponent: React.FC<ChecklistProps> = ({ cardId, checklists }) =>
                       }))
                     }
                     placeholder="Add an item..."
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                     onKeyPress={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
@@ -379,7 +379,7 @@ const ChecklistComponent: React.FC<ChecklistProps> = ({ cardId, checklists }) =>
                 console.log('Add checklist button clicked');
                 setShowAddChecklist(true);
               }}
-              className="w-full justify-start text-gray-600 hover:text-gray-800 hover:bg-gray-100 border border-gray-300 border-dashed px-3 py-2 rounded-md flex items-center cursor-pointer transition-all duration-200 pointer-events-auto hover:border-solid focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full justify-start text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 border-dashed px-3 py-2 rounded-md flex items-center cursor-pointer transition-all duration-200 pointer-events-auto hover:border-solid focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               style={{ pointerEvents: 'auto', zIndex: 10 }}
               onMouseEnter={(e) => {
                 console.log('Mouse entered button');
@@ -394,13 +394,13 @@ const ChecklistComponent: React.FC<ChecklistProps> = ({ cardId, checklists }) =>
               Add checklist
             </button>
           ) : (
-            <div className="bg-gray-50 rounded-lg p-4 border border-gray-300">
+            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-300 dark:border-gray-600">
               <input
                 type="text"
                 value={newChecklistTitle}
                 onChange={(e) => setNewChecklistTitle(e.target.value)}
                 placeholder="Checklist title..."
-                className="w-full px-3 py-2 mb-3 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 mb-3 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                 autoFocus
                 onKeyPress={(e) => {
                   if (e.key === 'Enter') {

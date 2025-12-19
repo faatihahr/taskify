@@ -54,25 +54,9 @@ const AllBoardsPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Header />
+
       <main className="flex-1 p-3 sm:p-4 md:p-6 lg:p-8">
         <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground">
-                All Boards {loading && '(Loading...)'}
-              </h1>
-              <p className="text-muted-foreground text-sm sm:text-base mt-1">
-                {boards.length} {boards.length === 1 ? 'board' : 'boards'} total
-              </p>
-            </div>
-            {!loading && boards.length > 0 && (
-              <Button onClick={handleCreateBoard} className="flex items-center gap-2 w-full sm:w-auto">
-                <Plus className="h-4 w-4" />
-                <span className="hidden sm:inline">Create New Board</span>
-                <span className="sm:hidden">Create Board</span>
-              </Button>
-            )}
-          </div>
 
           {loading ? (
             <div className="text-center py-8 sm:py-12">

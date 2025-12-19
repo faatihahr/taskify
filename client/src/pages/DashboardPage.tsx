@@ -10,12 +10,14 @@ import { Button } from '../components/ui/button';
 import { Plus } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { fetchUserBoards } from '../store/boardsSlice';
+import { getPendingInvitations, acceptInvitationById } from '../store/invitationSlice';
 import { useNavigate } from 'react-router-dom';
 import CreateBoardModal from '../components/boards/CreateBoardModal';
 
 const DashboardPage: React.FC = () => {
   const dispatch = useAppDispatch();
   const { loading: boardsLoading } = useAppSelector((state) => state.boards);
+  const { invitations, loading: invitationsLoading } = useAppSelector((state: any) => state.invitation);
   const location = useLocation();
   const navigate = useNavigate();
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -23,6 +25,8 @@ const DashboardPage: React.FC = () => {
   useEffect(() => {
     // Fetch boards data when dashboard loads
     dispatch(fetchUserBoards());
+    // Fetch pending invitations
+    dispatch(getPendingInvitations());
   }, [dispatch]);
 
   useEffect(() => {
@@ -62,7 +66,76 @@ const DashboardPage: React.FC = () => {
           </div>
           
           <DashboardStats />
-          
+
+          {/* Pending Invitations Section */}
+          {invitations && invitations.length > 0 && (
+            <Card className="p-6 border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-800">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-blue-800 dark:text-blue-200">
+                  Pending Invitations ({invitations.length})
+                </h2>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => dispatch(getPendingInvitations())}
+                  disabled={invitationsLoading}
+                >
+                  Refresh
+                </Button>
+              </div>
+
+              <div className="space-y-3">
+                {invitations.map((invitation: any) => (
+                  <div key={invitation.id} className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-lg border">
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-900 dark:text-gray-100">
+                        Invited to "{invitation.board?.title || 'Unknown Board'}"
+                      </p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        Invited by {invitation.inviter?.name || 'Unknown User'}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-500">
+                        Expires: {new Date(invitation.expiresAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="flex gap-2 ml-4">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-red-600 hover:text-red-700"
+                        onClick={() => {
+                          // TODO: Implement decline functionality
+                          console.log('Decline invitation:', invitation.id);
+                        }}
+                        disabled={invitationsLoading}
+                      >
+                        Decline
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="bg-blue-600 hover:bg-blue-700"
+                        onClick={async () => {
+                          try {
+                            await dispatch(acceptInvitationById(invitation.id)).unwrap();
+                            // Refresh invitations list
+                            dispatch(getPendingInvitations());
+                            // Refresh board list to show newly joined board
+                            dispatch(fetchUserBoards());
+                          } catch (error) {
+                            console.error('Failed to accept invitation:', error);
+                          }
+                        }}
+                        disabled={invitationsLoading}
+                      >
+                        Accept
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
           <div className="grid gap-6 md:grid-cols-2">
             <Card className="p-6">
               <h2 className="text-xl font-semibold mb-4">Recent Tasks</h2>

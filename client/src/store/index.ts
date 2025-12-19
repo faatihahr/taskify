@@ -1,6 +1,7 @@
 import { configureStore } from '@reduxjs/toolkit'
 import authReducer from './authSlice'
 import boardsReducer from './boardsSlice'
+import invitationReducer from './invitationSlice'
 import { restoreSession } from './authSlice'
 import { setAuthToken } from '../lib/api'
 
@@ -8,6 +9,7 @@ export const store = configureStore({
   reducer: {
     auth: authReducer,
     boards: boardsReducer,
+    invitation: invitationReducer,
   },
 })
 

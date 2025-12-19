@@ -4,15 +4,14 @@ import { useAppSelector } from '../../store/hooks';
 import { updateTaskDescription, createComment, createChecklist, updateCardLabels, updateTaskDueDate } from '../../store/boardsSlice';
 import type { AppDispatch } from '../../store';
 import { Button } from '../ui/button';
-import { 
-  X, 
-  Plus, 
-  Calendar, 
-  Users, 
-  Tag, 
-  CheckSquare, 
-  Volume2, 
-  Image as ImageIcon, 
+import {
+  X,
+  Calendar,
+  Users,
+  Tag,
+  CheckSquare,
+  Volume2,
+  Image as ImageIcon,
   MoreVertical,
   Edit,
   ChevronDown,
@@ -20,8 +19,10 @@ import {
   Upload,
   Search
 } from 'lucide-react';
+import RichTextEditor from '../RichTextEditor';
 import ChecklistComponent from '../checklist/Checklist';
 import LabelPicker from '../labels/LabelPicker';
+import MemberInviteModal from '../members/MemberInviteModal';
 
 // Utility function to validate and format image URLs
 const validateImageUrl = (imageUrl: string): string => {
@@ -71,6 +72,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
   const [isLabelPickerOpen, setIsLabelPickerOpen] = useState(false);
   const [currentLabels, setCurrentLabels] = useState(task?.labels || []);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [isMemberInviteModalOpen, setIsMemberInviteModalOpen] = useState(false);
 
   // Get comments directly from Redux store
   const comments = useMemo(() => {
@@ -291,10 +293,6 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
 
             {/* Action Buttons */}
             <div className="flex items-center gap-2 flex-wrap">
-              <Button variant="ghost" size="sm" className="text-white hover:bg-white/20 border border-white/30 cursor-pointer">
-                <Plus className="h-3 w-3 mr-1" />
-                Add
-              </Button>
               <Button 
                 variant="ghost" 
                 size="sm" 
@@ -328,7 +326,13 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
                 <CheckSquare className="h-3 w-3 mr-1" />
                 Checklist
               </Button>
-              <Button variant="ghost" size="sm" className="text-white hover:bg-white/20 border border-white/30 cursor-pointer">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setIsMemberInviteModalOpen(true)}
+                className="text-white hover:bg-white/20 border border-white/30 cursor-pointer transition-all duration-200 hover:scale-105"
+                style={{ pointerEvents: 'auto', zIndex: 20, position: 'relative' }}
+              >
                 <Users className="h-3 w-3 mr-1" />
                 Members
               </Button>
@@ -399,11 +403,11 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
 
               {isEditingDescription ? (
                 <div className="space-y-2">
-                  <textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    className="w-full min-h-[120px] p-3 border rounded-md resize-none text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600"
+                  <RichTextEditor
+                    content={description}
+                    onChange={setDescription}
                     placeholder="Add a more detailed description..."
+                    className="w-full"
                   />
                   <div className="flex gap-2">
                     <Button
@@ -425,7 +429,17 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
               ) : (
                 <div className="text-gray-700 dark:text-gray-300 space-y-2">
                   {description ? (
-                    <div className="whitespace-pre-wrap">{description}</div>
+                    <div
+                      className="ql-editor ql-snow"
+                      dangerouslySetInnerHTML={{ __html: description }}
+                      style={{
+                        padding: 0,
+                        border: 'none',
+                        fontSize: '14px',
+                        lineHeight: '1.6',
+                        backgroundColor: 'transparent'
+                      }}
+                    />
                   ) : (
                     <div className="text-gray-500 dark:text-gray-400 italic">No description provided. Click Edit to add one.</div>
                   )}
@@ -594,6 +608,15 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
             console.error('Failed to clear due date:', error);
           }
         }}
+      />
+
+      {/* Member Invite Modal */}
+      <MemberInviteModal
+        isOpen={isMemberInviteModalOpen}
+        onClose={() => setIsMemberInviteModalOpen(false)}
+        boardId={currentBoard?.id || ''}
+        boardName={currentBoard?.title || ''}
+        currentMembers={currentBoard?.members || []}
       />
     </div>
   );

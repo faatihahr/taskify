@@ -114,11 +114,6 @@ const TaskCard: React.FC<{ task: any; index: number; onClick: () => void }> = ({
             <h4 className="text-xs sm:text-sm font-semibold text-card-foreground line-clamp-2">
               {task.title}
             </h4>
-            {task.description && (
-              <p className="text-xs text-muted-foreground mt-1 sm:mt-2 line-clamp-2 sm:line-clamp-3">
-                {task.description}
-              </p>
-            )}
 
             {/* Priority indicator */}
             <div className="flex items-center justify-between mt-2 sm:mt-3">

@@ -27,6 +27,7 @@ model User {
   comments      Comment[]
   activities    Activity[]
   attachments   Attachment[]
+  invitationsSent Invitation[]
 
   @@map("users")
 }
@@ -45,6 +46,7 @@ model Board {
   lists        List[]
   members      BoardMember[]
   activities   Activity[]
+  invitations  Invitation[]
 
   @@map("boards")
 }
@@ -196,4 +198,21 @@ model Activity {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("activities")
+}
+
+model Invitation {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  status    String   @default("PENDING") // PENDING, ACCEPTED, REJECTED, EXPIRED
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  boardId String
+  board   Board   @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  inviterId String
+  inviter   User   @relation(fields: [inviterId], references: [id], onDelete: Cascade)
+
+  @@map("invitations")
 }

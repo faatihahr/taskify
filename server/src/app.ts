@@ -73,6 +73,10 @@ app.use('/api', listRoutes);
 import cardRoutes from './routes/card';
 app.use('/api/cards', cardRoutes);
 
+// Import and use invitation routes
+import invitationRoutes from './routes/invitation';
+app.use('/api/invitation', invitationRoutes);
+
 // Import and setup Swagger
 import { swaggerUi, swaggerSpec } from './swagger/swagger';
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));

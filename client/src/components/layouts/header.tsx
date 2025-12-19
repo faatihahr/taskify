@@ -1,14 +1,15 @@
 import React, { useState } from 'react'
 import { Button } from '../ui/button'
-import { Moon, Sun, Menu, X, LogOut } from 'lucide-react'
+import { Moon, Sun, Menu, X, LogOut, ChevronLeft } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '../../store/hooks'
 import { logout } from '../../store/authSlice'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useTheme } from '../../contexts/ThemeContext'
 
 const Header: React.FC = () => {
   const { theme, toggleTheme } = useTheme()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const location = useLocation()
 
   const toggleMobileMenu = () => {
     setMobileMenuOpen(!mobileMenuOpen)
@@ -27,15 +28,30 @@ const Header: React.FC = () => {
     <header className="bg-card/95 backdrop-blur-lg border-b border-border/50 sticky top-0 z-50 shadow-sm">
       <div className="container-custom">
         <div className="flex items-center justify-between h-16 md:h-20">
-          {/* Logo */}
-          <a href="/" className="flex items-center space-x-2 group">
-            <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg gradient-purple flex items-center justify-center transform group-hover:scale-110 transition-transform">
-              <span className="text-white font-bold text-lg md:text-xl">T</span>
-            </div>
-            <span className="text-xl md:text-2xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-              Taskify
-            </span>
-          </a>
+          {/* Logo with Back Button */}
+          <div className="flex items-center gap-3">
+            {/* Back Button - Only show on All Boards page */}
+            {user && location.pathname === '/boards' && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/dashboard')}
+                className="flex items-center gap-2 p-2"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                <span className="hidden md:inline">Back</span>
+              </Button>
+            )}
+
+            <a href="/" className="flex items-center space-x-2 group">
+              <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg gradient-purple flex items-center justify-center transform group-hover:scale-110 transition-transform">
+                <span className="text-white font-bold text-lg md:text-xl">T</span>
+              </div>
+              <span className="text-xl md:text-2xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+                Taskify
+              </span>
+            </a>
+          </div>
 
           {/* Desktop Navigation - Hidden when logged in */}
           {!user && (
