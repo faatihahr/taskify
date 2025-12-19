@@ -194,8 +194,8 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
   if (!isOpen || !task) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="w-full max-w-6xl max-h-[90vh] bg-white rounded-xl shadow-2xl flex overflow-hidden">
+    <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4">
+      <div className="w-full max-w-6xl max-h-[90vh] bg-white dark:bg-gray-900 rounded-xl shadow-2xl flex overflow-hidden">
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Header */}
@@ -337,9 +337,9 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
 
           {/* Header Checklist Input Modal */}
           {showHeaderAddChecklist && (
-            <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">Add New Checklist</h3>
+            <div className="absolute inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50">
+              <div className="bg-white dark:bg-gray-900 rounded-lg p-6 w-full max-w-md mx-4">
+                <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Add New Checklist</h3>
                 <input
                   type="text"
                   value={headerChecklistTitle}
@@ -383,20 +383,20 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
             {/* Description Section */}
             <div className="mb-8">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-lg font-semibold text-gray-800">Description</h2>
+                <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Description</h2>
                 {!isEditingDescription && (
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => setIsEditingDescription(true)}
-                    className="text-gray-600 hover:text-gray-800 cursor-pointer"
+                    className="text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 cursor-pointer"
                   >
                     <Edit className="h-3 w-3 mr-1" />
                     Edit
                   </Button>
                 )}
               </div>
-              
+
               {isEditingDescription ? (
                 <div className="space-y-2">
                   <textarea
@@ -406,16 +406,16 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
                     placeholder="Add a more detailed description..."
                   />
                   <div className="flex gap-2">
-                    <Button 
-                      size="sm" 
+                    <Button
+                      size="sm"
                       onClick={handleSaveDescription}
                       className="bg-blue-600 hover:bg-blue-700"
                     >
                       Save
                     </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={() => setIsEditingDescription(false)}
                     >
                       Cancel
@@ -423,11 +423,11 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
                   </div>
                 </div>
               ) : (
-                <div className="text-gray-700 space-y-2">
+                <div className="text-gray-700 dark:text-gray-300 space-y-2">
                   {description ? (
                     <div className="whitespace-pre-wrap">{description}</div>
                   ) : (
-                    <div className="text-gray-500 italic">No description provided. Click Edit to add one.</div>
+                    <div className="text-gray-500 dark:text-gray-400 italic">No description provided. Click Edit to add one.</div>
                   )}
                 </div>
               )}
@@ -435,35 +435,8 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
 
             {/* Checklist Section */}
             <div ref={checklistRef} className="mb-8 relative" style={{ zIndex: 1 }}>
-              <h2 className="text-lg font-semibold text-gray-800 mb-3">Checklist</h2>
+              <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-3">Checklist</h2>
               <ChecklistComponent cardId={task.id} checklists={checklists} />
-            </div>
-
-            {/* Workflow Section */}
-            <div className="mb-8">
-              <h2 className="text-lg font-semibold text-gray-800 mb-3">Workflow</h2>
-              <div className="space-y-2">
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
-                    1
-                  </div>
-                  <p className="text-gray-700">User can register</p>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
-                    2
-                  </div>
-                  <p className="text-gray-700">User can login</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Flow Register Section */}
-            <div className="mb-8">
-              <h2 className="text-lg font-semibold text-gray-800 mb-3">Flow Register</h2>
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <p className="text-gray-700">Registration flow details would go here...</p>
-              </div>
             </div>
 
             {/* Attachments Section */}
@@ -484,14 +457,14 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
         </div>
 
         {/* Sidebar */}
-        <div className="w-80 border-l border-gray-200 bg-gray-50 flex flex-col">
+        <div className="w-80 border-l border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex flex-col">
           {/* Comments and Activity Section */}
           <div className="p-4 border-b border-gray-200">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-gray-800">Comments and activity</h3>
-              <Button 
-                variant="ghost" 
-                size="sm" 
+              <h3 className="font-semibold text-gray-800 dark:text-gray-100">Comments and activity</h3>
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => setShowActivityDetails(!showActivityDetails)}
                 className="text-blue-600 hover:text-blue-700 text-xs cursor-pointer"
               >
@@ -662,11 +635,11 @@ const DatePickerModal: React.FC<{
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="w-full max-w-md bg-white rounded-xl shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4">
+      <div className="w-full max-w-md bg-white dark:bg-gray-900 rounded-xl shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="bg-gray-50 border-b border-gray-200 p-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-800">Set Due Date</h2>
+        <div className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Set Due Date</h2>
           <Button variant="ghost" size="sm" onClick={onClose}>
             <X className="h-4 w-4" />
           </Button>
@@ -675,21 +648,21 @@ const DatePickerModal: React.FC<{
         {/* Content */}
         <div className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Select Date
             </label>
             <input
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800"
               min={new Date().toISOString().split('T')[0]} // Prevent past dates
             />
           </div>
 
           {currentDueDate && (
-            <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
-              <p className="text-sm text-blue-800">
+            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
+              <p className="text-sm text-blue-800 dark:text-blue-200">
                 Current due date: {new Date(currentDueDate).toLocaleDateString()}
               </p>
             </div>
@@ -697,7 +670,7 @@ const DatePickerModal: React.FC<{
         </div>
 
         {/* Footer */}
-        <div className="bg-gray-50 border-t border-gray-200 p-4 flex justify-between">
+        <div className="bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4 flex justify-between">
           <div className="flex gap-2">
             {currentDueDate && (
               <Button variant="outline" onClick={handleClear} className="text-red-600 hover:text-red-700">
