@@ -67,9 +67,10 @@ model BoardMember {
 model List {
   id        String   @id @default(cuid())
   title     String
+  color     String?  // Warna list (hex color atau class name)
   position  Int      // Untuk ordering/drag and drop
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now())
 
   boardId String
   board   Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)

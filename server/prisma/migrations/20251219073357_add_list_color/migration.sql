@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "lists" ADD COLUMN     "color" TEXT,
+ALTER COLUMN "updatedAt" SET DEFAULT CURRENT_TIMESTAMP;

@@ -58,9 +58,44 @@ export const createList = async (req: AuthenticatedRequest, res: Response) => {
       finalPosition = maxPosition ? maxPosition.position + 1 : 0;
     }
 
+    // Generate unique color for the list (not used in this board)
+    const listColors = [
+      'bg-blue-100 border-blue-300 dark:bg-blue-900/50 dark:border-blue-700',
+      'bg-green-100 border-green-300 dark:bg-green-900/50 dark:border-green-700',
+      'bg-yellow-100 border-yellow-300 dark:bg-yellow-900/50 dark:border-yellow-700',
+      'bg-purple-100 border-purple-300 dark:bg-purple-900/50 dark:border-purple-700',
+      'bg-pink-100 border-pink-300 dark:bg-pink-900/50 dark:border-pink-700',
+      'bg-indigo-100 border-indigo-300 dark:bg-indigo-900/50 dark:border-indigo-700',
+      'bg-red-100 border-red-300 dark:bg-red-900/50 dark:border-red-700',
+      'bg-orange-100 border-orange-300 dark:bg-orange-900/50 dark:border-orange-700',
+    ];
+
+    // Get colors already used in this board
+    const existingLists = await prisma.list.findMany({
+      where: { boardId },
+      select: { color: true }
+    });
+
+    const usedColors = existingLists
+      .filter(list => list.color)
+      .map(list => list.color);
+
+    // Get available colors (not used in this board)
+    const availableColors = listColors.filter(color => !usedColors.includes(color));
+
+    let assignedColor;
+    if (availableColors.length > 0) {
+      // Pick random from available colors
+      assignedColor = availableColors[Math.floor(Math.random() * availableColors.length)];
+    } else {
+      // Fallback: use any color if all are used (shouldn't happen with 8 colors)
+      assignedColor = listColors[Math.floor(Math.random() * listColors.length)];
+    }
+
     const list = await prisma.list.create({
       data: {
         title,
+        color: assignedColor,
         boardId,
         position: finalPosition
       },
@@ -121,10 +156,18 @@ export const getBoardLists = async (req: AuthenticatedRequest, res: Response) =>
       return res.status(403).json({ error: 'Not authorized to view lists in this board' });
     }
 
+    // Get lists with their current data
     const lists = await prisma.list.findMany({
       where: { boardId },
       orderBy: { position: 'asc' },
-      include: {
+      select: {
+        id: true,
+        title: true,
+        color: true,
+        position: true,
+        createdAt: true,
+        updatedAt: true,
+        boardId: true,
         cards: {
           orderBy: { position: 'asc' },
           include: {
@@ -135,6 +178,53 @@ export const getBoardLists = async (req: AuthenticatedRequest, res: Response) =>
         }
       }
     });
+
+    // Auto-assign unique colors to lists that don't have them
+    const listColors = [
+      'bg-blue-100 border-blue-300 dark:bg-blue-900/50 dark:border-blue-700',
+      'bg-green-100 border-green-300 dark:bg-green-900/50 dark:border-green-700',
+      'bg-yellow-100 border-yellow-300 dark:bg-yellow-900/50 dark:border-yellow-700',
+      'bg-purple-100 border-purple-300 dark:bg-purple-900/50 dark:border-purple-700',
+      'bg-pink-100 border-pink-300 dark:bg-pink-900/50 dark:border-pink-700',
+      // 'bg-indigo-100 border-indigo-300 dark:bg-indigo-900/50 dark:border-indigo-700',
+      'bg-red-100 border-red-300 dark:bg-red-900/50 dark:border-red-700',
+      'bg-orange-100 border-orange-300 dark:bg-orange-900/50 dark:border-orange-700',
+    ];
+
+    // Check and update lists without colors
+    const listsToUpdate = lists.filter(list => !list.color);
+    if (listsToUpdate.length > 0) {
+      console.log(`Auto-assigning unique colors to ${listsToUpdate.length} lists without colors in board ${boardId}`);
+
+      // Get colors already used in this board
+      const usedColors = lists
+        .filter(list => list.color)
+        .map(list => list.color);
+
+      // Get available colors (not used in this board)
+      const availableColors = listColors.filter(color => !usedColors.includes(color));
+
+      for (const list of listsToUpdate) {
+        let assignedColor;
+
+        if (availableColors.length > 0) {
+          // Assign from available colors
+          const randomIndex = Math.floor(Math.random() * availableColors.length);
+          assignedColor = availableColors.splice(randomIndex, 1)[0];
+        } else {
+          // Fallback: use any color if all are used (shouldn't happen with 8 colors)
+          assignedColor = listColors[Math.floor(Math.random() * listColors.length)];
+        }
+
+        await prisma.list.update({
+          where: { id: list.id },
+          data: { color: assignedColor }
+        });
+
+        // Update the in-memory list object
+        list.color = assignedColor;
+      }
+    }
 
     res.json(lists);
   } catch (error) {
@@ -319,7 +409,14 @@ export const moveList = async (req: AuthenticatedRequest, res: Response) => {
     const updatedList = await prisma.list.update({
       where: { id },
       data: { position },
-      include: {
+      select: {
+        id: true,
+        title: true,
+        color: true,
+        position: true,
+        createdAt: true,
+        updatedAt: true,
+        boardId: true,
         cards: {
           orderBy: { position: 'asc' }
         }

@@ -443,7 +443,7 @@ const BoardPage: React.FC = () => {
                       <div
                         ref={provided.innerRef}
                         {...provided.draggableProps}
-                        className={`w-64 sm:w-72 ${listColors[index % listColors.length]} rounded-lg flex-shrink-0 border-2 shadow-md transition-shadow ${
+                        className={`w-64 sm:w-72 ${list.color || listColors[index % listColors.length]} rounded-lg flex-shrink-0 border-2 shadow-md transition-shadow ${
                           snapshot.isDragging ? 'shadow-2xl' : ''
                         }`}
                         style={{

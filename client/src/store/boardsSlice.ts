@@ -31,6 +31,7 @@ interface Card {
 interface List {
   id: string
   title: string
+  color?: string
   position: number
   createdAt: string
   updatedAt: string
