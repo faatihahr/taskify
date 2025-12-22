@@ -16,16 +16,47 @@ type Task = {
 const RecentTasks: React.FC = () => {
   const { boards } = useAppSelector((state) => state.boards);
 
-  // Generate mock tasks based on boards (in real app, this would come from cards API)
-  const tasks: Task[] = boards.slice(0, 4).map((board, index) => ({
-    id: `task-${board.id}`,
-    title: `Sample task from ${board.title}`,
-    boardTitle: board.title,
-    boardId: board.id,
-    dueDate: new Date(Date.now() + (index - 2) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    status: index === 0 ? 'completed' : index === 3 ? 'overdue' : 'in-progress' as const,
-    priority: index === 0 ? 'low' : index === 1 ? 'medium' : 'high' as const,
-  }));
+  // Get real tasks from all boards' cards with safe navigation
+  const allCards = (boards || []).flatMap(board =>
+    (board.lists || []).flatMap(list =>
+      (list.cards || []).map(card => ({
+        ...card,
+        boardTitle: board.title,
+        boardId: board.id,
+        listTitle: list.title,
+      }))
+    )
+  );
+
+  // Sort by most recently updated and take top 5
+  const recentCards = allCards
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    .slice(0, 5);
+
+  // Map cards to Task format
+  const tasks: Task[] = recentCards.map((card, index) => {
+    // Determine status based on completion and due date
+    let status: 'completed' | 'in-progress' | 'overdue' = 'in-progress';
+    if (card.completed) {
+      status = 'completed';
+    } else if (card.dueDate && new Date(card.dueDate) < new Date()) {
+      status = 'overdue';
+    }
+
+    // Determine priority (for now, rotate through priorities)
+    const priorities: ('low' | 'medium' | 'high')[] = ['low', 'medium', 'high'];
+    const priority = priorities[index % 3];
+
+    return {
+      id: card.id,
+      title: card.title,
+      boardTitle: card.boardTitle,
+      boardId: card.boardId,
+      dueDate: card.dueDate ? new Date(card.dueDate).toISOString().split('T')[0] : undefined,
+      status,
+      priority,
+    };
+  });
 
   const getStatusIcon = (status: Task['status']) => {
     switch (status) {

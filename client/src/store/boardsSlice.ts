@@ -94,6 +94,30 @@ export const fetchUserBoards = createAsyncThunk(
   }
 )
 
+export const fetchUserBoardsWithDetails = createAsyncThunk(
+  'boards/fetchUserBoardsWithDetails',
+  async () => {
+    const response = await api.get('/api/boards')
+    const boards = response.data.boards
+
+    // Fetch full details for each board
+    const boardsWithDetails = await Promise.all(
+      boards.map(async (board: any) => {
+        try {
+          const detailResponse = await api.get(`/api/boards/${board.id}`)
+          return detailResponse.data.board
+        } catch (error) {
+          console.error(`Failed to fetch details for board ${board.id}:`, error)
+          // Return basic board info if detail fetch fails
+          return board
+        }
+      })
+    )
+
+    return boardsWithDetails
+  }
+)
+
 export const fetchBoardById = createAsyncThunk(
   'boards/fetchBoardById',
   async (boardId: string) => {
@@ -299,6 +323,22 @@ export const deleteChecklistItem = createAsyncThunk(
   }
 )
 
+export const deleteBoard = createAsyncThunk(
+  'boards/deleteBoard',
+  async ({ boardId }: { boardId: string }) => {
+    await api.delete(`/api/boards/${boardId}`)
+    return boardId;
+  }
+)
+
+export const deleteList = createAsyncThunk(
+  'boards/deleteList',
+  async ({ listId }: { listId: string }) => {
+    await api.delete(`/api/lists/${listId}`)
+    return listId;
+  }
+)
+
 export const deleteCard = createAsyncThunk(
   'boards/deleteCard',
   async ({ cardId }: { cardId: string }) => {
@@ -379,6 +419,19 @@ const boardsSlice = createSlice({
         state.loading = false
         state.error = action.error.message || 'Failed to fetch boards'
       })
+      // Fetch boards with details
+      .addCase(fetchUserBoardsWithDetails.pending, (state) => {
+        state.loading = true
+        state.error = null
+      })
+      .addCase(fetchUserBoardsWithDetails.fulfilled, (state, action: PayloadAction<Board[]>) => {
+        state.loading = false
+        state.boards = action.payload
+      })
+      .addCase(fetchUserBoardsWithDetails.rejected, (state, action) => {
+        state.loading = false
+        state.error = action.error.message || 'Failed to fetch boards with details'
+      })
       // Fetch board by ID
       .addCase(fetchBoardById.pending, (state) => {
         state.currentBoardLoading = true
@@ -404,6 +457,35 @@ const boardsSlice = createSlice({
       .addCase(createBoard.rejected, (state, action) => {
         state.loading = false
         state.error = action.error.message || 'Failed to create board'
+      })
+      // Delete board
+      .addCase(deleteBoard.fulfilled, (state, action) => {
+        const boardId = action.payload;
+        state.boards = state.boards.filter(board => board.id !== boardId);
+        if (state.currentBoard?.id === boardId) {
+          state.currentBoard = null;
+        }
+        console.log('Board deleted from Redux store:', boardId);
+      })
+      .addCase(deleteBoard.rejected, (state, action) => {
+        console.error('Delete board failed:', action.error.message);
+        state.error = action.error.message || 'Failed to delete board';
+      })
+      // Delete list
+      .addCase(deleteList.fulfilled, (state, action) => {
+        if (state.currentBoard) {
+          const listId = action.payload;
+          state.currentBoard.lists = state.currentBoard.lists.filter(list => list.id !== listId);
+          // Update positions of remaining lists
+          state.currentBoard.lists.forEach((list, index) => {
+            list.position = index;
+          });
+          console.log('List deleted from Redux store:', listId);
+        }
+      })
+      .addCase(deleteList.rejected, (state, action) => {
+        console.error('Delete list failed:', action.error.message);
+        state.error = action.error.message || 'Failed to delete list';
       })
       // Create list
       .addCase(createList.fulfilled, (state, action) => {

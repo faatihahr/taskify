@@ -46,10 +46,10 @@ const Header: React.FC = () => {
 
             <a href="/" className="flex items-center space-x-2 group">
               <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg gradient-purple flex items-center justify-center transform group-hover:scale-110 transition-transform">
-                <span className="text-white font-bold text-lg md:text-xl">T</span>
+                  <span className="text-white font-bold text-sm md:text-base">DIA</span>
               </div>
-              <span className="text-xl md:text-2xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-                Taskify
+              <span className="text-lg md:text-xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+                Do It Anytime
               </span>
             </a>
           </div>

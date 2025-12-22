@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Bell, 
-  AlertCircle, 
-  Clock, 
-  X, 
-  Check, 
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  Bell,
+  AlertCircle,
+  Clock,
+  X,
+  Check,
   CheckSquare,
   MessageSquare,
   Users,
@@ -37,134 +37,145 @@ interface NotificationItem {
 
 const NotificationCenter: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [loading, setLoading] = useState(false);
-  
+  const [readNotifications, setReadNotifications] = useState<Set<string>>(new Set());
+
   const { user } = useAppSelector((state) => state.auth);
+  const { boards } = useAppSelector((state) => state.boards);
   const navigate = useNavigate();
+
+  // Load read notifications from localStorage on mount
+  useEffect(() => {
+    if (user?.id) {
+      const storageKey = `taskify-read-notifications-${user.id}`;
+      const stored = localStorage.getItem(storageKey);
+      if (stored) {
+        try {
+          const readIds = JSON.parse(stored);
+          setReadNotifications(new Set(readIds));
+        } catch (error) {
+          console.error('Failed to parse stored notifications:', error);
+        }
+      }
+    } else {
+      // Clear read notifications when user logs out
+      setReadNotifications(new Set());
+    }
+  }, [user?.id]);
+
+  // Save read notifications to localStorage whenever state changes
+  useEffect(() => {
+    if (user?.id && readNotifications.size > 0) {
+      const storageKey = `taskify-read-notifications-${user.id}`;
+      const readIds = Array.from(readNotifications);
+      localStorage.setItem(storageKey, JSON.stringify(readIds));
+    }
+  }, [readNotifications, user?.id]);
+
+  // Generate notifications from cards with due dates within 7 days
+  const notifications = useMemo(() => {
+    if (!boards || !user || boards.length === 0) return [];
+
+    const now = new Date();
+    const sevenDaysFromNow = new Date();
+    sevenDaysFromNow.setDate(now.getDate() + 7);
+
+    const upcomingCards = (boards || []).flatMap(board =>
+      (board.lists || []).flatMap(list =>
+        (list.cards || [])
+          .filter(card => card.dueDate && !card.completed)
+          .map(card => ({
+            ...card,
+            boardTitle: board.title,
+            boardId: board.id,
+            listTitle: list.title,
+            listId: list.id,
+          }))
+      )
+    ).filter(card => {
+      const dueDate = new Date(card.dueDate!);
+      return dueDate >= now && dueDate <= sevenDaysFromNow;
+    }).sort((a, b) => new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime());
+
+    return upcomingCards.map(card => {
+      const dueDate = new Date(card.dueDate!);
+      const daysDiff = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+      let type: string;
+      let title: string;
+      let message: string;
+
+      if (daysDiff < 0) {
+        // Overdue
+        type = 'task_overdue';
+        title = `Overdue: ${card.title}`;
+        message = `This task was due ${Math.abs(daysDiff)} day${Math.abs(daysDiff) !== 1 ? 's' : ''} ago`;
+      } else if (daysDiff === 0) {
+        // Due today
+        type = 'task_due';
+        title = `Due Today: ${card.title}`;
+        message = 'This task is due today';
+      } else if (daysDiff === 1) {
+        // Due tomorrow
+        type = 'task_due';
+        title = `Due Tomorrow: ${card.title}`;
+        message = 'This task is due tomorrow';
+      } else {
+        // Due in X days
+        type = 'task_due';
+        title = `Due in ${daysDiff} days: ${card.title}`;
+        message = `This task is due on ${dueDate.toLocaleDateString()}`;
+      }
+
+      return {
+        id: `due-${card.id}`,
+        title,
+        message,
+        type,
+        isRead: readNotifications.has(`due-${card.id}`),
+        createdAt: card.updatedAt,
+        board: {
+          id: card.boardId,
+          title: card.boardTitle,
+        },
+        card: {
+          id: card.id,
+          title: card.title,
+          list: {
+            id: card.listId,
+            title: card.listTitle,
+          },
+        },
+      };
+    });
+  }, [boards, user, readNotifications]);
+
+  const unreadCount = notifications.filter(n => !n.isRead).length;
 
   useEffect(() => {
     if (user) {
-      fetchNotifications();
-      fetchUnreadCount();
-      
-      // Set up polling for new notifications
+      // Auto-refresh every 2 hours (7200000 ms)
       const interval = setInterval(() => {
-        fetchUnreadCount();
-      }, 30000); // Check every 30 seconds
+        // Force re-render to update time-based notifications
+        setReadNotifications(prev => new Set(prev));
+      }, 7200000);
 
       return () => clearInterval(interval);
     }
   }, [user]);
 
-  const fetchNotifications = async () => {
-    if (!user) return;
-    
-    try {
-      setLoading(true);
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/notifications', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setNotifications(data);
-      }
-    } catch (error) {
-      console.error('Error fetching notifications:', error);
-    } finally {
-      setLoading(false);
-    }
+  const markAsRead = (notificationId: string) => {
+    setReadNotifications(prev => new Set([...prev, notificationId]));
   };
 
-  const fetchUnreadCount = async () => {
-    if (!user) return;
-    
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/notifications/unread-count', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setUnreadCount(data.count);
-      }
-    } catch (error) {
-      console.error('Error fetching unread count:', error);
-    }
+  const markAllAsRead = () => {
+    const allIds = notifications.map(n => n.id);
+    setReadNotifications(prev => new Set([...prev, ...allIds]));
   };
 
-  const markAsRead = async (notificationId: string) => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/notifications/${notificationId}/read`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (response.ok) {
-        setNotifications(prev => 
-          prev.map(notif => 
-            notif.id === notificationId ? { ...notif, isRead: true } : notif
-          )
-        );
-        setUnreadCount(prev => Math.max(0, prev - 1));
-      }
-    } catch (error) {
-      console.error('Error marking notification as read:', error);
-    }
-  };
-
-  const markAllAsRead = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/notifications/read-all', {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (response.ok) {
-        setNotifications(prev => 
-          prev.map(notif => ({ ...notif, isRead: true }))
-        );
-        setUnreadCount(0);
-      }
-    } catch (error) {
-      console.error('Error marking all notifications as read:', error);
-    }
-  };
-
-  const deleteNotification = async (notificationId: string) => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/notifications/${notificationId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (response.ok) {
-        setNotifications(prev => prev.filter(notif => notif.id !== notificationId));
-        const deletedNotif = notifications.find(n => n.id === notificationId);
-        if (deletedNotif && !deletedNotif.isRead) {
-          setUnreadCount(prev => Math.max(0, prev - 1));
-        }
-      }
-    } catch (error) {
-      console.error('Error deleting notification:', error);
-    }
+  const deleteNotification = (notificationId: string) => {
+    // For client-side notifications, we can't actually delete them
+    // Just mark as read to hide them
+    markAsRead(notificationId);
   };
 
   const handleNotificationClick = (notification: NotificationItem) => {
@@ -226,12 +237,7 @@ const NotificationCenter: React.FC = () => {
       <Button
         variant="ghost"
         size="icon"
-        onClick={() => {
-          setIsOpen(!isOpen);
-          if (!isOpen) {
-            fetchNotifications();
-          }
-        }}
+        onClick={() => setIsOpen(!isOpen)}
         className="relative rounded-full"
       >
         <Bell className="h-5 w-5" />
@@ -275,12 +281,7 @@ const NotificationCenter: React.FC = () => {
 
           {/* Content */}
           <div className="max-h-96 overflow-y-auto">
-            {loading ? (
-              <div className="p-8 text-center text-gray-500 dark:text-gray-400">
-                <Bell className="h-12 w-12 mx-auto mb-3 opacity-50 animate-pulse" />
-                <p className="text-sm">Loading notifications...</p>
-              </div>
-            ) : notifications.length === 0 ? (
+            {notifications.length === 0 ? (
               <div className="p-8 text-center text-gray-500 dark:text-gray-400">
                 <Bell className="h-12 w-12 mx-auto mb-3 opacity-50" />
                 <p className="text-sm">No notifications</p>
@@ -325,8 +326,8 @@ const NotificationCenter: React.FC = () => {
                       </div>
                     </div>
                     
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      {!notification.isRead && (
+                    {!notification.isRead && (
+                      <div className="flex items-center gap-1 flex-shrink-0">
                         <Button
                           variant="ghost"
                           size="sm"
@@ -338,19 +339,19 @@ const NotificationCenter: React.FC = () => {
                         >
                           <Check className="h-3 w-3" />
                         </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteNotification(notification.id);
-                        }}
-                        className="h-6 w-6 p-0"
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteNotification(notification.id);
+                          }}
+                          className="h-6 w-6 p-0"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

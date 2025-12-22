@@ -66,13 +66,13 @@ const LoginForm: React.FC = () => {
         <CardHeader className="text-center space-y-3 pb-6">
           {/* Logo */}
           <div className="mx-auto w-16 h-16 rounded-2xl gradient-purple flex items-center justify-center mb-2">
-            <span className="text-white font-bold text-2xl">T</span>
+            <span className="text-white font-bold text-xl">DIA</span>
           </div>
           <CardTitle className="text-3xl font-bold">
             Welcome Back
           </CardTitle>
           <CardDescription className="text-base">
-            Sign in to continue to your workspace
+            Do It Anytime - Manage your tasks efficiently
           </CardDescription>
         </CardHeader>
 

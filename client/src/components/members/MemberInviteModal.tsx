@@ -35,8 +35,8 @@ const MemberInviteModal: React.FC<MemberInviteModalProps> = ({
     }
 
     // Check if user is already a member
-    const isAlreadyMember = currentMembers.some(member => 
-      member.email?.toLowerCase() === email.toLowerCase()
+    const isAlreadyMember = currentMembers.some(member =>
+      member.user?.email?.toLowerCase() === email.toLowerCase()
     );
 
     if (isAlreadyMember) {
@@ -125,9 +125,10 @@ const MemberInviteModal: React.FC<MemberInviteModalProps> = ({
                 {currentMembers.slice(0, 3).map((member, index) => (
                   <div key={index} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                     <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs">
-                      {member.name?.charAt(0)?.toUpperCase() || member.email?.charAt(0)?.toUpperCase() || 'U'}
+                      {member.user?.name?.charAt(0)?.toUpperCase() ||
+                       member.user?.email?.charAt(0)?.toUpperCase() || 'U'}
                     </div>
-                    <span>{member.name || member.email}</span>
+                    <span>{member.user?.name || member.user?.email || 'Unknown User'}</span>
                   </div>
                 ))}
                 {currentMembers.length > 3 && (

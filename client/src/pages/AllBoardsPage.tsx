@@ -4,18 +4,21 @@ import Header from '../components/layouts/header';
 import Footer from '../components/layouts/footer';
 import { Card } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import { Plus, Folder, Users, Clock, CheckCircle } from 'lucide-react';
+import { Plus, Folder, Users, Clock, CheckCircle, Trash2 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { fetchUserBoards } from '../store/boardsSlice';
+import { fetchUserBoards, deleteBoard } from '../store/boardsSlice';
 import { Link } from 'react-router-dom';
 import CreateBoardModal from '../components/boards/CreateBoardModal';
+import { useAppSelector as useAuthSelector } from '../store/hooks';
 
 const AllBoardsPage: React.FC = () => {
   const dispatch = useAppDispatch();
   const { boards, loading } = useAppSelector((state) => state.boards);
+  const { user } = useAppSelector((state) => state.auth);
   const location = useLocation();
   const navigate = useNavigate();
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [boardToDelete, setBoardToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     dispatch(fetchUserBoards());
@@ -49,6 +52,22 @@ const AllBoardsPage: React.FC = () => {
   const getBoardColor = (index: number) => {
     const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500', 'bg-pink-500'];
     return colors[index % colors.length];
+  };
+
+  const handleDeleteBoard = async () => {
+    if (!boardToDelete) return;
+
+    try {
+      await dispatch(deleteBoard({ boardId: boardToDelete })).unwrap();
+      setBoardToDelete(null);
+    } catch (error) {
+      console.error('Failed to delete board:', error);
+      alert('Failed to delete board. Please try again.');
+    }
+  };
+
+  const isBoardOwner = (board: any) => {
+    return user && board.ownerId === user.id;
   };
 
   return (
@@ -87,8 +106,8 @@ const AllBoardsPage: React.FC = () => {
                           <Folder className="h-4 w-4 sm:h-6 sm:w-6 text-white" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <Link 
-                            to={`/board/${board.id}`} 
+                          <Link
+                            to={`/board/${board.id}`}
                             className="font-medium text-sm sm:text-lg hover:text-primary transition-colors block truncate"
                           >
                             {board.title}
@@ -100,6 +119,19 @@ const AllBoardsPage: React.FC = () => {
                           )}
                         </div>
                       </div>
+                      {isBoardOwner(board) && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setBoardToDelete(board.id);
+                          }}
+                          className="text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 h-auto"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
 
                     <div className="flex items-center space-x-3 sm:space-x-4 text-xs sm:text-sm text-muted-foreground">
@@ -153,16 +185,44 @@ const AllBoardsPage: React.FC = () => {
       <Footer />
       
       {/* Create Board Modal */}
-      <CreateBoardModal 
-        isOpen={showCreateModal} 
+      <CreateBoardModal
+        isOpen={showCreateModal}
         onClose={() => {
           setShowCreateModal(false);
           // Redirect to /boards if we're on /boards/create
           if (location.pathname === '/boards/create') {
             navigate('/boards');
           }
-        }} 
+        }}
       />
+
+      {/* Delete Board Confirmation Dialog */}
+      {boardToDelete && (
+        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-md p-6">
+            <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-gray-100">
+              Delete Board
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
+              Are you sure you want to delete this board? This action cannot be undone and will permanently remove the board and all its content.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <Button
+                variant="outline"
+                onClick={() => setBoardToDelete(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleDeleteBoard}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                Delete Board
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

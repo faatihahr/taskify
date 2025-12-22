@@ -108,8 +108,7 @@ const ChecklistComponent: React.FC<ChecklistProps> = ({ cardId, checklists }) =>
         description
       })).unwrap();
       setEditingChecklistDescription(prev => ({ ...prev, [checklistId]: false }));
-      // Clear the local description state after successful update
-      setChecklistDescriptions(prev => ({ ...prev, [checklistId]: '' }));
+      // Don't clear the local description state - let Redux handle the state
     } catch (error) {
       console.error('Failed to update checklist description:', error);
     }

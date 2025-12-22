@@ -3,9 +3,9 @@ import { useParams } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import type { DropResult } from '@hello-pangea/dnd';
 import { Button } from '../components/ui/button';
-import { Plus, ChevronLeft, Image as ImageIcon, CheckSquare } from 'lucide-react';
+import { Plus, ChevronLeft, Image as ImageIcon, CheckSquare, Trash2 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { fetchBoardById, reorderCards, updateCardPosition, moveList, updateTaskCoverImage, updateTaskCoverImageLocal } from '../store/boardsSlice';
+import { fetchBoardById, reorderCards, updateCardPosition, moveList, updateTaskCoverImage, updateTaskCoverImageLocal, deleteList } from '../store/boardsSlice';
 import CreateListModal from '../components/lists/CreateListModal';
 import CreateCardModal from '../components/cards/CreateCardModal';
 import TaskDetailModal from '../components/cards/TaskDetailModal';
@@ -223,6 +223,10 @@ const BoardPage: React.FC = () => {
     dueDateFilter: null,
     activityFilter: null,
   });
+  const [listToDelete, setListToDelete] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [autoScrollDirection, setAutoScrollDirection] = useState<'left' | 'right' | null>(null);
+  const [scrollContainer, setScrollContainer] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
     if (boardId) {
@@ -328,6 +332,69 @@ const BoardPage: React.FC = () => {
   const handleBackToDashboard = () => {
     navigate('/boards');
   };
+
+  // Auto-scroll functionality for mobile drag-and-drop
+  const startAutoScroll = (direction: 'left' | 'right') => {
+    if (!scrollContainer) return null;
+
+    const scrollSpeed = 8;
+    const interval = setInterval(() => {
+      if (direction === 'left') {
+        scrollContainer.scrollLeft -= scrollSpeed;
+      } else {
+        scrollContainer.scrollLeft += scrollSpeed;
+      }
+    }, 16); // ~60fps
+
+    return interval;
+  };
+
+  const handleDragStart = () => {
+    setIsDragging(true);
+  };
+
+  const handleDragUpdate = (update: any) => {
+    if (!isDragging || !scrollContainer || window.innerWidth >= 768) return; // Only on mobile
+
+    const { clientX } = update;
+    const containerRect = scrollContainer.getBoundingClientRect();
+    const threshold = 100; // pixels from edge to trigger auto-scroll
+
+    // Clear existing auto-scroll
+    if (autoScrollDirection) {
+      setAutoScrollDirection(null);
+    }
+
+    // Check if dragging near left edge (scroll left to show more lists)
+    if (clientX - containerRect.left < threshold) {
+      setAutoScrollDirection('left');
+    }
+    // Check if dragging near right edge (scroll right to show more lists)
+    else if (containerRect.right - clientX < threshold) {
+      setAutoScrollDirection('right');
+    }
+  };
+
+  const handleDragEndFinal = (result: DropResult) => {
+    setIsDragging(false);
+    setAutoScrollDirection(null);
+    handleDragEnd(result);
+  };
+
+  // Auto-scroll effect
+  useEffect(() => {
+    let intervalId: number | null = null;
+
+    if (autoScrollDirection && scrollContainer) {
+      intervalId = startAutoScroll(autoScrollDirection);
+    }
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [autoScrollDirection, scrollContainer]);
 
   const handleDragEnd = async (result: DropResult) => {
     console.log('=== DRAG END TRIGGERED ===');
@@ -505,8 +572,19 @@ const BoardPage: React.FC = () => {
       </div>
 
       {/* Board Content */}
-      <div className="p-3 sm:p-6 overflow-x-auto">
-        <DragDropContext onDragEnd={handleDragEnd}>
+      <div
+        ref={(el) => setScrollContainer(el)}
+        className="p-3 sm:p-6 overflow-x-auto scrollbar scrollbar-thumb-primary/70 scrollbar-track-muted hover:scrollbar-thumb-primary dark:scrollbar-thumb-primary/80 dark:scrollbar-track-muted dark:hover:scrollbar-thumb-primary touch-pan-x"
+      >
+        {/* Mobile scroll hint */}
+        <div className="md:hidden text-center text-xs text-muted-foreground mb-2 opacity-70">
+          ← Scroll horizontally to see all lists →
+        </div>
+        <DragDropContext
+          onDragEnd={handleDragEnd}
+          onDragStart={handleDragStart}
+          onDragUpdate={handleDragUpdate}
+        >
           <Droppable
             droppableId="lists"
             direction="horizontal"
@@ -516,9 +594,10 @@ const BoardPage: React.FC = () => {
               <div
                 {...provided.droppableProps}
                 ref={provided.innerRef}
-                className={`flex gap-2 sm:gap-4 min-h-[calc(100vh-150px)] sm:min-h-[calc(100vh-200px)] transition-colors duration-200 ${
+                className={`flex flex-nowrap gap-2 sm:gap-4 min-h-[calc(100vh-150px)] sm:min-h-[calc(100vh-200px)] transition-colors duration-200 ${
                   snapshot.isDraggingOver ? 'bg-primary/5' : ''
                 }`}
+                style={{ scrollBehavior: 'smooth' }}
               >
                 {filteredListsData.map((list: any, index: number) => {
                   return (
@@ -544,9 +623,24 @@ const BoardPage: React.FC = () => {
                               <h3 className="font-semibold text-foreground text-sm sm:text-base truncate">
                                 {list.title}
                               </h3>
-                              <span className="text-xs sm:text-sm font-bold text-foreground bg-background/60 px-2 py-1 rounded-full shadow-sm flex-shrink-0">
-                                {list.cards?.length || 0}
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs sm:text-sm font-bold text-foreground bg-background/60 px-2 py-1 rounded-full shadow-sm flex-shrink-0">
+                                  {list.cards?.length || 0}
+                                </span>
+                                {list.cards?.length === 0 && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      setListToDelete(list.id);
+                                    }}
+                                    className="text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 p-1 h-auto"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                )}
+                              </div>
                             </div>
                           </div>
 
@@ -638,6 +732,44 @@ const BoardPage: React.FC = () => {
             setSelectedTask(null);
           }}
         />
+      )}
+
+      {/* Delete List Confirmation Dialog */}
+      {listToDelete && (
+        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-md p-6">
+            <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-gray-100">
+              Delete List
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
+              Are you sure you want to delete this list? This action cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <Button
+                variant="outline"
+                onClick={() => setListToDelete(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={async () => {
+                  if (!listToDelete) return;
+
+                  try {
+                    await dispatch(deleteList({ listId: listToDelete })).unwrap();
+                    setListToDelete(null);
+                  } catch (error) {
+                    console.error('Failed to delete list:', error);
+                    alert('Failed to delete list. Please try again.');
+                  }
+                }}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                Delete List
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

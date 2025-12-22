@@ -29,7 +29,7 @@ const HeroSection: React.FC = () => {
 
           {/* Subtitle */}
           <p className="text-lg md:text-xl lg:text-2xl text-muted-foreground mb-10 max-w-3xl mx-auto leading-relaxed">
-            Taskify is your collaborative task management solution. Organize projects, track progress, and boost productivity with our intuitive Kanban boards.
+            Do It Anytime - Your collaborative task management solution. Organize projects, track progress, and boost productivity with our intuitive Kanban boards.
           </p>
 
           {/* CTA Buttons */}

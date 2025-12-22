@@ -9,7 +9,7 @@ import { Card } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Plus } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { fetchUserBoards } from '../store/boardsSlice';
+import { fetchUserBoardsWithDetails } from '../store/boardsSlice';
 import { getPendingInvitations, acceptInvitationById } from '../store/invitationSlice';
 import { useNavigate } from 'react-router-dom';
 import CreateBoardModal from '../components/boards/CreateBoardModal';
@@ -25,7 +25,7 @@ const DashboardPage: React.FC = () => {
 
   useEffect(() => {
     // Fetch boards data when dashboard loads
-    dispatch(fetchUserBoards());
+    dispatch(fetchUserBoardsWithDetails());
     // Fetch pending invitations
     dispatch(getPendingInvitations());
   }, [dispatch]);
@@ -125,7 +125,7 @@ const DashboardPage: React.FC = () => {
                             // Refresh invitations list
                             dispatch(getPendingInvitations());
                             // Refresh board list to show newly joined board
-                            dispatch(fetchUserBoards());
+                            dispatch(fetchUserBoardsWithDetails());
                           } catch (error) {
                             console.error('Failed to accept invitation:', error);
                           }

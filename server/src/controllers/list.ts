@@ -18,12 +18,19 @@ export const createList = async (req: AuthenticatedRequest, res: Response) => {
     const { title, position } = req.body;
     const { boardId } = req.params;
     const userId = req.user?.id;
-    
+
+    console.log('=== CREATE LIST DEBUG ===');
+    console.log('Request body:', { title, position });
+    console.log('Board ID:', boardId);
+    console.log('User ID:', userId);
+
     if (!userId) {
+      console.log('User not authenticated');
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
     if (!title || !boardId) {
+      console.log('Missing required fields:', { title, boardId });
       return res.status(400).json({ error: 'Title and boardId are required' });
     }
 
@@ -32,12 +39,16 @@ export const createList = async (req: AuthenticatedRequest, res: Response) => {
       where: { id: boardId }
     });
 
+    console.log('Board found:', board ? { id: board.id, ownerId: board.ownerId } : 'null');
+
     if (!board) {
+      console.log('Board not found');
       return res.status(404).json({ error: 'Board not found' });
     }
 
     // Get user board info and permissions
     const boardInfo = await getUserBoardInfo(userId, boardId);
+    console.log('Board info:', boardInfo);
     
     if (!boardInfo || !boardInfo.hasAccess) {
       return res.status(403).json({ error: 'Not authorized to create list in this board' });

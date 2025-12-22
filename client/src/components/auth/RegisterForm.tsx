@@ -74,13 +74,13 @@ const RegisterForm: React.FC = () => {
         <CardHeader className="text-center space-y-3 pb-6">
           {/* Logo */}
           <div className="mx-auto w-16 h-16 rounded-2xl gradient-purple flex items-center justify-center mb-2">
-            <span className="text-white font-bold text-2xl">T</span>
+            <span className="text-white font-bold text-xl">DIA</span>
           </div>
           <CardTitle className="text-3xl font-bold">
             Create Account
           </CardTitle>
           <CardDescription className="text-base">
-            Join Taskify to start managing your projects
+            Do It Anytime - Start managing your tasks today
           </CardDescription>
         </CardHeader>
 
