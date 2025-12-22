@@ -68,7 +68,7 @@ export const inviteMember = async (req: Request, res: Response) => {
     }
 
     // Check if user is already a member
-    const existingMember = board.members.some((member: any) => 
+    const existingMember = board.members.some((member: any) =>
       member.user.email === email
     );
 
@@ -98,9 +98,9 @@ export const inviteMember = async (req: Request, res: Response) => {
 
     // Create invitation token
     const invitationToken = jwt.sign(
-      { 
-        email, 
-        boardId, 
+      {
+        email,
+        boardId,
         inviterId,
         type: 'board_invitation'
       },
@@ -155,7 +155,7 @@ export const acceptInvitation = async (req: Request, res: Response) => {
 
     // Verify and decode the token
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
-    
+
     const { email, boardId, inviterId, type } = decoded;
 
     if (type !== 'board_invitation') {
@@ -214,7 +214,6 @@ export const acceptInvitation = async (req: Request, res: Response) => {
       data: {
         userId: user.id,
         boardId: boardId,
-        role: 'MEMBER', // Default role
       },
     });
 
@@ -250,7 +249,7 @@ export const acceptInvitation = async (req: Request, res: Response) => {
 
   } catch (error) {
     console.error('Accept invitation error:', error);
-    
+
     if (error instanceof jwt.JsonWebTokenError) {
       return res.status(400).json({
         success: false,
@@ -333,7 +332,6 @@ export const acceptInvitationById = async (req: Request, res: Response) => {
       data: {
         userId: userId,
         boardId: invitation.boardId,
-        role: 'MEMBER',
       },
     });
 

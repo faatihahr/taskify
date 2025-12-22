@@ -53,7 +53,6 @@ model Board {
 
 model BoardMember {
   id        String   @id @default(cuid())
-  role      String   @default("member") // owner, admin, member
   joinedAt  DateTime @default(now())
 
   boardId String

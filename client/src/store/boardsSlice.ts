@@ -139,7 +139,7 @@ export const moveList = createAsyncThunk(
 export const updateCardPosition = createAsyncThunk(
   'boards/updateCardPosition',
   async ({ cardId, listId, position }: { cardId: string; listId: string; position: number }) => {
-    const response = await api.put(`/api/cards/${cardId}`, { listId, position })
+    const response = await api.put(`/api/cards/${cardId}/move`, { listId, position })
     return response.data
   }
 )

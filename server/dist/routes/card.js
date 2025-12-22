@@ -597,6 +597,16 @@ router.post('/:id/cover', card_1.coverUploadMiddleware, card_1.uploadCoverImage)
  *               $ref: '#/components/schemas/Error'
  */
 router.post('/:id/comments', card_1.createComment);
+// Checklist routes
+router.post('/:id/checklists', card_1.createChecklist);
+router.put('/checklists/:checklistId', card_1.updateChecklist);
+router.post('/checklists/:checklistId/items', card_1.createChecklistItem);
+router.put('/checklists/items/:itemId', card_1.updateChecklistItem);
+router.delete('/checklists/:checklistId', card_1.deleteChecklist);
+router.delete('/checklists/items/:itemId', card_1.deleteChecklistItem);
+// Label routes
+router.put('/:id/labels', card_1.updateCardLabels);
+router.get('/labels/all', card_1.getAllLabels);
 // Test endpoint for debugging
 router.post('/:id/comments/test', (req, res) => {
     console.log('Test comment endpoint hit');

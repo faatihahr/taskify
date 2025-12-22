@@ -17,7 +17,9 @@ exports.updateCardSchema = joi_1.default.object({
     title: joi_1.default.string().optional().min(1).max(255),
     description: joi_1.default.string().optional().allow('').max(1000),
     dueDate: joi_1.default.date().optional().allow(null),
-    coverImage: joi_1.default.string().uri().optional().allow(null),
+    coverImage: joi_1.default.alternatives().try(joi_1.default.string().uri(), // Full URIs like https://...
+    joi_1.default.string().pattern(/^\/uploads\//) // Relative URLs like /uploads/covers/...
+    ).optional().allow(null),
     completed: joi_1.default.boolean().optional(),
     listId: joi_1.default.string().optional(),
     position: joi_1.default.number().integer().min(0).optional()

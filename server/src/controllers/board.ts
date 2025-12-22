@@ -31,8 +31,7 @@ export async function createBoard(req: Request, res: Response) {
         ownerId: userId,
         members: {
           create: {
-            userId,
-            role: 'owner'
+            userId
           }
         }
       },
@@ -91,7 +90,11 @@ export async function getUserBoards(req: Request, res: Response) {
       include: {
         owner: true,
         members: {
-          include: {
+          select: {
+            id: true,
+            userId: true,
+            boardId: true,
+            joinedAt: true,
             user: {
               select: {
                 id: true,
@@ -146,12 +149,17 @@ export async function getBoardById(req: Request, res: Response) {
       }
     }
 
-    const board = await prisma.board.findUnique({
+    // Get basic board info
+    const basicBoard = await prisma.board.findUnique({
       where: { id },
       include: {
         owner: true,
         members: {
-          include: {
+          select: {
+            id: true,
+            userId: true,
+            boardId: true,
+            joinedAt: true,
             user: {
               select: {
                 id: true,
@@ -160,96 +168,87 @@ export async function getBoardById(req: Request, res: Response) {
               }
             }
           }
-        },
-        lists: {
-          orderBy: {
-            position: 'asc'
-          },
-          select: {
-            id: true,
-            title: true,
-            color: true,
-            position: true,
-            createdAt: true,
-            updatedAt: true,
-            boardId: true,
-            cards: {
-              orderBy: {
-                position: 'asc'
-              },
-              select: {
-                id: true,
-                title: true,
-                description: true,
-                position: true,
-                coverImage: true,
-                dueDate: true,
-                completed: true,
-                createdAt: true,
-                updatedAt: true,
-                listId: true,
-                creatorId: true,
-                creator: {
-                  select: {
-                    id: true,
-                    name: true
-                  }
-                },
-                labels: true,
-                comments: {
-                  include: {
-                    user: {
-                      select: {
-                        id: true,
-                        name: true
-                      }
-                    }
-                  },
-                  orderBy: {
-                    createdAt: 'desc'
-                  }
-                },
-                checklists: {
-                  include: {
-                    items: {
-                      orderBy: { position: 'asc' }
-                    }
-                  },
-                  orderBy: { position: 'asc' }
-                },
-                _count: {
-                  select: {
-                    comments: true,
-                    attachments: true,
-                    checklists: true
-                  }
-                }
-              }
-            }
-          }
-        },
-        activities: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true
-              }
-            }
-          },
-          orderBy: {
-            createdAt: 'desc'
-          },
-          take: 10 // Recent activities
         }
       }
     });
 
-    if (!board) {
+    if (!basicBoard) {
       const error = new Error('Board not found');
       (error as any).status = 404;
       throw error;
     }
+
+    // Get lists with cards
+    const lists = await prisma.list.findMany({
+      where: { boardId: id },
+      orderBy: { position: 'asc' },
+      include: {
+        cards: {
+          orderBy: { position: 'asc' },
+          include: {
+            creator: {
+              select: {
+                id: true,
+                name: true
+              }
+            },
+            labels: true,
+            comments: {
+              orderBy: { createdAt: 'desc' },
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true
+                  }
+                }
+              }
+            },
+            checklists: {
+              orderBy: { position: 'asc' },
+              include: {
+                items: {
+                  orderBy: { position: 'asc' }
+                }
+              }
+            },
+            _count: {
+              select: {
+                comments: true,
+                attachments: true,
+                checklists: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    // Get recent activities
+    const activities = await prisma.activity.findMany({
+      where: { boardId: id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 10
+    });
+
+    // Combine the data
+    const board = {
+      ...basicBoard,
+      lists,
+      activities,
+      _count: {
+        lists: lists.length,
+        members: basicBoard.members.length
+      }
+    };
 
     // Auto-assign unique colors to lists that don't have them
     const listColors = [

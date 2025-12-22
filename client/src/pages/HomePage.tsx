@@ -22,7 +22,7 @@ const HomePage: React.FC = () => {
         <div className="bg-element-1"></div>
         <div className="bg-element-2"></div>
       </div>
-      <main className="flex-1 relative z-10">
+      <main className="flex-1 relative z-10 pt-16 md:pt-20">
         <HeroSection />
         <FeaturesSection />
       </main>

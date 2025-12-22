@@ -1,13 +1,5 @@
 import { Request, Response } from 'express';
 import { prisma } from '../prisma/client';
-import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
-import { 
-  createCardSchema, 
-  updateCardSchema, 
-  moveCardSchema 
-} from '../validation/card_joi';
 
 // Extend Request type to include user
 interface AuthenticatedRequest extends Request {
@@ -16,56 +8,23 @@ interface AuthenticatedRequest extends Request {
     email: string;
     name?: string;
   };
-  file?: Express.Multer.File;
 }
-
-// Configure multer for cover image uploads
-const coverStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadsDir = path.join(process.cwd(), 'uploads', 'covers');
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
-    }
-    cb(null, uploadsDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const ext = path.extname(file.originalname);
-    cb(null, `cover-${uniqueSuffix}${ext}`);
-  }
-});
-
-const coverUpload = multer({
-  storage: coverStorage,
-  limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit for cover images
-  },
-  fileFilter: (req, file, cb) => {
-    const allowedTypes = [
-      'image/jpeg',
-      'image/png', 
-      'image/gif',
-      'image/webp'
-    ];
-    
-    if (allowedTypes.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Invalid file type. Only JPEG, PNG, GIF, and WebP images are allowed for cover images.'));
-    }
-  }
-});
 
 // Create a new card
 export const createCard = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { title, description, listId, position, dueDate, coverImage } = req.body;
-    const creatorId = req.user?.id;
-    if (!creatorId) {
+    const { title, description, listId } = req.body;
+    const userId = req.user?.id;
+
+    if (!userId) {
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
-    // Verify list exists
+    if (!title || !listId) {
+      return res.status(400).json({ error: 'Title and listId are required' });
+    }
+
+    // Get list and verify board access
     const list = await prisma.list.findUnique({
       where: { id: listId },
       include: { board: true }
@@ -75,63 +34,38 @@ export const createCard = async (req: AuthenticatedRequest, res: Response) => {
       return res.status(404).json({ error: 'List not found' });
     }
 
-    // Check if user is board member
-    const isMember = await prisma.boardMember.findUnique({
+    // Check if user has access to this board
+    const boardMember = await prisma.boardMember.findFirst({
       where: {
-        boardId_userId: {
-          boardId: list.board.id,
-          userId: creatorId
-        }
+        boardId: list.board.id,
+        userId
       }
     });
 
-    if (!isMember && list.board.ownerId !== creatorId) {
+    if (!boardMember && list.board.ownerId !== userId) {
       return res.status(403).json({ error: 'Not authorized to create card in this board' });
     }
 
-    // If position not provided, put it at the end
-    let finalPosition = position;
-    if (position === undefined) {
-      const maxPosition = await prisma.card.findFirst({
-        where: { listId },
-        orderBy: { position: 'desc' }
-      });
-      finalPosition = maxPosition ? maxPosition.position + 1 : 0;
-    }
+    // Get the next position for this card
+    const maxPosition = await prisma.card.findFirst({
+      where: { listId },
+      orderBy: { position: 'desc' }
+    });
+    const position = maxPosition ? maxPosition.position + 1 : 0;
 
     const card = await prisma.card.create({
       data: {
-        title,
-        description,
+        title: title.trim(),
+        description: description?.trim() || '',
         listId,
-        creatorId,
-        position: finalPosition,
-        dueDate: dueDate ? new Date(dueDate) : null,
-        coverImage
+        position,
+        creatorId: userId
       },
       include: {
         creator: {
           select: { id: true, name: true, email: true }
         },
-        list: {
-          include: {
-            board: true
-          }
-        },
-        labels: true,
-        attachments: true,
-        comments: {
-          include: {
-            user: {
-              select: { id: true, name: true, email: true }
-            }
-          }
-        },
-        checklists: {
-          include: {
-            items: true
-          }
-        }
+        list: true
       }
     });
 
@@ -139,25 +73,27 @@ export const createCard = async (req: AuthenticatedRequest, res: Response) => {
     await prisma.activity.create({
       data: {
         action: 'created',
-        details: JSON.stringify({ cardTitle: title }),
+        details: JSON.stringify({ cardTitle: card.title }),
         boardId: list.board.id,
         cardId: card.id,
-        userId: creatorId
+        userId
       }
     });
 
-    res.status(201).json({ card });
+    res.status(201).json(card);
   } catch (error) {
     console.error('Create card error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
 
-// Get card by ID
-export const getCard = async (req: AuthenticatedRequest, res: Response) => {
+// Update a card
+export const updateCard = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
+    const { title, description, dueDate, coverImage, completed } = req.body;
     const userId = req.user?.id;
+
     if (!userId) {
       return res.status(401).json({ error: 'User not authenticated' });
     }
@@ -165,44 +101,9 @@ export const getCard = async (req: AuthenticatedRequest, res: Response) => {
     const card = await prisma.card.findUnique({
       where: { id },
       include: {
-        creator: {
-          select: { id: true, name: true, email: true }
-        },
         list: {
           include: {
-            board: {
-              include: {
-                members: {
-                  where: { userId },
-                  select: { role: true }
-                }
-              }
-            }
-          }
-        },
-        labels: true,
-        attachments: true,
-        comments: {
-          orderBy: { createdAt: 'asc' },
-          include: {
-            user: {
-              select: { id: true, name: true, email: true }
-            }
-          }
-        },
-        checklists: {
-          include: {
-            items: {
-              orderBy: { position: 'asc' }
-            }
-          }
-        },
-        activities: {
-          orderBy: { createdAt: 'desc' },
-          include: {
-            user: {
-              select: { id: true, name: true, email: true }
-            }
+            board: true
           }
         }
       }
@@ -213,60 +114,14 @@ export const getCard = async (req: AuthenticatedRequest, res: Response) => {
     }
 
     // Check if user has access to this board
-    const hasAccess = card.list.board.members.length > 0 || card.list.board.ownerId === userId;
-    if (!hasAccess) {
-      return res.status(403).json({ error: 'Not authorized to view this card' });
-    }
-
-    res.json(card);
-  } catch (error) {
-    console.error('Get card error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-};
-
-// Update card
-export const updateCard = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const { id } = req.params;
-    const { title, description, dueDate, coverImage, completed, listId, position } = req.body;
-    const userId = req.user?.id;
-    
-    console.log('=== UPDATE CARD DEBUG ===');
-    console.log('Card ID:', id);
-    console.log('Request body:', { title, description, dueDate, coverImage, completed, listId, position });
-    console.log('User ID:', userId);
-    
-    if (!userId) {
-      return res.status(401).json({ error: 'User not authenticated' });
-    }
-
-    const card = await prisma.card.findUnique({
-      where: { id },
-      include: {
-        list: {
-          include: {
-            board: true
-          }
-        }
-      }
-    });
-
-    if (!card) {
-      return res.status(404).json({ error: 'Card not found' });
-    }
-
-    // Check if user is board member
-    const isMember = await prisma.boardMember.findUnique({
+    const boardMember = await prisma.boardMember.findFirst({
       where: {
-        boardId_userId: {
-          boardId: card.list.board.id,
-          userId
-        }
+        boardId: card.list.board.id,
+        userId
       }
     });
 
-    if (!isMember && card.list.board.ownerId !== userId) {
+    if (!boardMember && card.list.board.ownerId !== userId) {
       return res.status(403).json({ error: 'Not authorized to update this card' });
     }
 
@@ -277,227 +132,6 @@ export const updateCard = async (req: AuthenticatedRequest, res: Response) => {
     if (coverImage !== undefined) updateData.coverImage = coverImage;
     if (completed !== undefined) updateData.completed = completed;
 
-    // Handle listId and position updates (for drag and drop)
-    if (listId !== undefined && listId !== card.listId) {
-      // Verify user has access to the target list
-      const targetList = await prisma.list.findUnique({
-        where: { id: listId },
-        include: { board: true }
-      });
-
-      if (!targetList) {
-        return res.status(404).json({ error: 'Target list not found' });
-      }
-
-      // Check if user is member of target board
-      const isTargetBoardMember = await prisma.boardMember.findUnique({
-        where: {
-          boardId_userId: {
-            boardId: targetList.board.id,
-            userId
-          }
-        }
-      });
-
-      if (!isTargetBoardMember && targetList.board.ownerId !== userId) {
-        return res.status(403).json({ error: 'Not authorized to move card to this list' });
-      }
-
-      updateData.listId = listId;
-    }
-
-    if (position !== undefined) {
-      updateData.position = position;
-    }
-
-    // If moving card to different position or list, handle reordering
-    if ((listId !== undefined && listId !== card.listId) || 
-        (position !== undefined && position !== card.position)) {
-      
-      const targetListId = listId || card.listId;
-      const targetPosition = position !== undefined ? position : card.position;
-      const isMovingToSameList = targetListId === card.listId;
-      const currentPosition = card.position;
-      
-      console.log('REORDERING DEBUG:');
-      console.log('Current position:', currentPosition);
-      console.log('Target position:', targetPosition);
-      console.log('Target list ID:', targetListId);
-      console.log('Is same list:', isMovingToSameList);
-
-      // Get all cards in the target list (including current card if same list)
-      const allCardsInTargetList = await prisma.card.findMany({
-        where: { 
-          listId: targetListId
-        },
-        orderBy: { position: 'asc' }
-      });
-      
-      console.log('Cards in target list before update:', allCardsInTargetList.map(c => ({ id: c.id, position: c.position })));
-
-      // Update positions of other cards
-      await prisma.$transaction(async (tx) => {
-        if (isMovingToSameList) {
-          // Moving within same list - need to handle UI index vs database position
-          console.log('Moving within same list - handling UI index conversion');
-          
-          // Sort cards by position to ensure correct order
-          const sortedCards = allCardsInTargetList.sort((a, b) => a.position - b.position);
-          
-          // Find the actual database positions
-          let actualCurrentPosition = currentPosition;
-          let actualTargetPosition = targetPosition;
-          
-          // Find current card's position in sorted array
-          const currentCardIndex = sortedCards.findIndex(card => card.id === id);
-          if (currentCardIndex !== -1) {
-            actualCurrentPosition = sortedCards[currentCardIndex].position;
-          }
-          
-          // Calculate target position based on UI index
-          if (targetPosition === 0) {
-            actualTargetPosition = 0;
-          } else if (targetPosition >= sortedCards.length) {
-            const lastCard = sortedCards[sortedCards.length - 1];
-            actualTargetPosition = lastCard ? lastCard.position + 1 : 0;
-          } else {
-            const cardAtTargetIndex = sortedCards[targetPosition];
-            if (cardAtTargetIndex) {
-              actualTargetPosition = cardAtTargetIndex.position;
-            }
-          }
-          
-          console.log('Same list movement - Current:', actualCurrentPosition, '-> Target:', actualTargetPosition);
-          
-          if (actualTargetPosition < actualCurrentPosition) {
-            // Moving up: shift cards down between target and current position
-            for (const card of sortedCards) {
-              if (card.position >= actualTargetPosition && card.position < actualCurrentPosition && card.id !== id) {
-                console.log('Shifting card down:', card.id, 'from', card.position, 'to', card.position + 1);
-                await tx.card.update({
-                  where: { id: card.id },
-                  data: { position: card.position + 1 }
-                });
-              }
-            }
-          } else if (actualTargetPosition > actualCurrentPosition) {
-            // Moving down: shift cards up between current and target position
-            for (const card of sortedCards) {
-              if (card.position > actualCurrentPosition && card.position <= actualTargetPosition && card.id !== id) {
-                console.log('Shifting card up:', card.id, 'from', card.position, 'to', card.position - 1);
-                await tx.card.update({
-                  where: { id: card.id },
-                  data: { position: card.position - 1 }
-                });
-              }
-            }
-          }
-          
-          // Update the current card with the actual position
-          console.log('Updating current card within same list:', id, 'to position:', actualTargetPosition);
-          await tx.card.update({
-            where: { id },
-            data: { ...updateData, position: actualTargetPosition }
-          });
-          
-          return; // Skip the final update since we already updated in transaction
-        } else {
-          // Moving to different list
-          console.log('Moving to different list - calculating correct position');
-          
-          // For moving to different list, we need to calculate the actual database position
-          // The targetPosition from frontend is the UI index, not database position
-          // We need to find the correct database position based on existing cards
-          
-          let actualTargetPosition = targetPosition;
-          
-          // Sort cards by position to ensure correct order
-          const sortedTargetList = allCardsInTargetList.sort((a, b) => a.position - b.position);
-          
-          console.log('Sorted target list by position:', sortedTargetList.map(c => ({ id: c.id, position: c.position })));
-          
-          // Find the correct database position based on UI index
-          if (targetPosition === 0) {
-            // Inserting at the beginning, position should be 0
-            actualTargetPosition = 0;
-          } else if (targetPosition >= sortedTargetList.length) {
-            // Inserting at the end, position should be last card's position + 1
-            const lastCard = sortedTargetList[sortedTargetList.length - 1];
-            actualTargetPosition = lastCard ? lastCard.position + 1 : 0;
-          } else {
-            // Inserting in the middle, find the card at this position
-            const cardAtTargetPosition = sortedTargetList[targetPosition];
-            if (cardAtTargetPosition) {
-              actualTargetPosition = cardAtTargetPosition.position;
-            }
-          }
-          
-          console.log('UI target position:', targetPosition, '-> Actual database position:', actualTargetPosition);
-          
-          // Shift cards in target list to make space at the actual position
-          for (const card of allCardsInTargetList) {
-            if (card.position >= actualTargetPosition) {
-              console.log('Shifting target list card:', card.id, 'from', card.position, 'to', card.position + 1);
-              await tx.card.update({
-                where: { id: card.id },
-                data: { position: card.position + 1 }
-              });
-            }
-          }
-          
-          // Shift cards in source list to fill the gap
-          const sourceListCards = await prisma.card.findMany({
-            where: { 
-              listId: card.listId,
-              id: { not: id }
-            },
-            orderBy: { position: 'asc' }
-          });
-          
-          console.log('Filling gap in source list, current position:', currentPosition);
-          for (const sourceCard of sourceListCards) {
-            if (sourceCard.position > currentPosition) {
-              console.log('Shifting source list card:', sourceCard.id, 'from', sourceCard.position, 'to', sourceCard.position - 1);
-              await tx.card.update({
-                where: { id: sourceCard.id },
-                data: { position: sourceCard.position - 1 }
-              });
-            }
-          }
-          
-          // Update the current card with the actual position
-          console.log('Updating current card:', id, 'to actual position:', actualTargetPosition);
-          await tx.card.update({
-            where: { id },
-            data: { ...updateData, position: actualTargetPosition }
-          });
-          
-          return; // Skip the final update since we already updated in transaction
-        }
-
-        // Update the current card
-        console.log('Updating current card:', id, 'to position:', targetPosition);
-        await tx.card.update({
-          where: { id },
-          data: { ...updateData, position: targetPosition }
-        });
-      });
-
-      // Fetch updated card with relationships
-      const updatedCard = await prisma.card.findUnique({
-        where: { id },
-        include: {
-          list: true,
-          creator: {
-            select: { id: true, name: true, email: true }
-          }
-        }
-      });
-
-      return res.json(updatedCard);
-    }
-
-    // For non-position updates, use the regular update logic
     const updatedCard = await prisma.card.update({
       where: { id },
       data: updateData,
@@ -551,6 +185,7 @@ export const moveCard = async (req: AuthenticatedRequest, res: Response) => {
     const { id } = req.params;
     const { listId, position } = req.body;
     const userId = req.user?.id;
+    
     if (!userId) {
       return res.status(401).json({ error: 'User not authenticated' });
     }
@@ -609,16 +244,14 @@ export const moveCard = async (req: AuthenticatedRequest, res: Response) => {
       }
     } else {
       // Same board, check access
-      const isMember = await prisma.boardMember.findUnique({
+      const boardMember = await prisma.boardMember.findFirst({
         where: {
-          boardId_userId: {
-            boardId: card.list.board.id,
-            userId
-          }
+          boardId: card.list.board.id,
+          userId
         }
       });
 
-      if (!isMember && card.list.board.ownerId !== userId) {
+      if (!boardMember && card.list.board.ownerId !== userId) {
         return res.status(403).json({ error: 'Not authorized to move this card' });
       }
     }
@@ -703,6 +336,7 @@ export const deleteCard = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
     const userId = req.user?.id;
+    
     if (!userId) {
       return res.status(401).json({ error: 'User not authenticated' });
     }
@@ -722,17 +356,15 @@ export const deleteCard = async (req: AuthenticatedRequest, res: Response) => {
       return res.status(404).json({ error: 'Card not found' });
     }
 
-    // Check if user is board member
-    const isMember = await prisma.boardMember.findUnique({
+    // Check if user has access to this board
+    const boardMember = await prisma.boardMember.findFirst({
       where: {
-        boardId_userId: {
-          boardId: card.list.board.id,
-          userId
-        }
+        boardId: card.list.board.id,
+        userId
       }
     });
 
-    if (!isMember && card.list.board.ownerId !== userId) {
+    if (!boardMember && card.list.board.ownerId !== userId) {
       return res.status(403).json({ error: 'Not authorized to delete this card' });
     }
 
@@ -769,24 +401,91 @@ export const deleteCard = async (req: AuthenticatedRequest, res: Response) => {
   }
 };
 
-// Upload cover image for card
-export const uploadCoverImage = async (req: AuthenticatedRequest, res: Response) => {
+// Get card by ID
+export const getCardById = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
     const userId = req.user?.id;
-    const uploadedFile = req.file;
 
     if (!userId) {
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
-    if (!uploadedFile) {
-      return res.status(400).json({ error: 'No file uploaded' });
-    }
-
-    // Verify card exists and user has access
     const card = await prisma.card.findUnique({
       where: { id },
+      include: {
+        list: {
+          include: {
+            board: true
+          }
+        },
+        creator: {
+          select: { id: true, name: true, email: true }
+        },
+        labels: true,
+        attachments: true,
+        comments: {
+          include: {
+            user: {
+              select: { id: true, name: true, email: true }
+            }
+          },
+          orderBy: { createdAt: 'desc' }
+        },
+        checklists: {
+          include: {
+            items: {
+              orderBy: { position: 'asc' }
+            }
+          },
+          orderBy: { createdAt: 'asc' }
+        }
+      }
+    });
+
+    if (!card) {
+      return res.status(404).json({ error: 'Card not found' });
+    }
+
+    // Check if user has access to this card's board
+    const boardMember = await prisma.boardMember.findFirst({
+      where: {
+        boardId: card.list.board.id,
+        userId
+      }
+    });
+
+    if (!boardMember && card.list.board.ownerId !== userId) {
+      return res.status(403).json({ error: 'Not authorized to view this card' });
+    }
+
+    res.json(card);
+  } catch (error) {
+    console.error('Get card error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Get card by ID (alias)
+export const getCard = getCardById;
+
+// Create comment
+export const createComment = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { cardId, content } = req.body;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    if (!content || !cardId) {
+      return res.status(400).json({ error: 'Content and cardId are required' });
+    }
+
+    // Check if card exists and user has access
+    const card = await prisma.card.findUnique({
+      where: { id: cardId },
       include: {
         list: {
           include: {
@@ -800,131 +499,18 @@ export const uploadCoverImage = async (req: AuthenticatedRequest, res: Response)
       return res.status(404).json({ error: 'Card not found' });
     }
 
-    // Check if user is board member
-    const isMember = await prisma.boardMember.findUnique({
+    // Check if user has access to this card's board
+    const boardMember = await prisma.boardMember.findFirst({
       where: {
-        boardId_userId: {
-          boardId: card.list.board.id,
-          userId
-        }
-      }
-    });
-
-    if (!isMember && card.list.board.ownerId !== userId) {
-      return res.status(403).json({ error: 'Not authorized to update this card' });
-    }
-
-    // Delete old cover image if exists
-    if (card.coverImage) {
-      const oldCoverPath = path.join(process.cwd(), 'uploads', 'covers', path.basename(card.coverImage));
-      if (fs.existsSync(oldCoverPath)) {
-        fs.unlinkSync(oldCoverPath);
-      }
-    }
-
-    // Update card with new cover image URL
-    const coverImageUrl = `/uploads/covers/${uploadedFile.filename}`;
-    
-    const updatedCard = await prisma.card.update({
-      where: { id },
-      data: { coverImage: coverImageUrl },
-      include: {
-        creator: {
-          select: { id: true, name: true, email: true }
-        },
-        list: true,
-        labels: true,
-        attachments: true,
-        comments: {
-          include: {
-            user: {
-              select: { id: true, name: true, email: true }
-            }
-          }
-        },
-        checklists: {
-          include: {
-            items: true
-          }
-        }
-      }
-    });
-
-    // Create activity
-    await prisma.activity.create({
-      data: {
-        action: 'cover_image_updated',
-        details: JSON.stringify({ fileName: uploadedFile.originalname }),
         boardId: card.list.board.id,
-        cardId: card.id,
         userId
       }
     });
 
-    res.json({ card: updatedCard });
-  } catch (error) {
-    console.error('Upload cover image error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-};
-
-export const createComment = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const { id: cardId } = req.params;
-    const { content } = req.body;
-    const userId = req.user?.id;
-
-    console.log('Create comment request:', { cardId, content: content?.substring(0, 50), userId });
-
-    if (!userId) {
-      console.log('No user ID found');
-      return res.status(401).json({ error: 'User not authenticated' });
-    }
-
-    if (!content || content.trim().length === 0) {
-      console.log('No content provided');
-      return res.status(400).json({ error: 'Comment content is required' });
-    }
-
-    console.log('Looking for card:', cardId);
-
-    // Check if card exists and user has access
-    const card = await prisma.card.findUnique({
-      where: { id: cardId },
-      include: {
-        list: {
-          include: {
-            board: {
-              include: {
-                members: {
-                  where: { userId }
-                }
-              }
-            }
-          }
-        }
-      }
-    });
-
-    console.log('Card found:', card ? 'Yes' : 'No');
-
-    if (!card) {
-      return res.status(404).json({ error: 'Card not found' });
-    }
-
-    // Check if user is board owner or member
-    const isOwner = card.list.board.ownerId === userId;
-    const isMember = card.list.board.members.length > 0;
-
-    console.log('User access check:', { isOwner, isMember, userId, ownerId: card.list.board.ownerId });
-
-    if (!isOwner && !isMember) {
+    if (!boardMember && card.list.board.ownerId !== userId) {
       return res.status(403).json({ error: 'Not authorized to comment on this card' });
     }
 
-    console.log('Creating comment...');
-
-    // Create comment
     const comment = await prisma.comment.create({
       data: {
         content: content.trim(),
@@ -933,611 +519,40 @@ export const createComment = async (req: AuthenticatedRequest, res: Response) =>
       },
       include: {
         user: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
+          select: { id: true, name: true, email: true }
         }
       }
     });
 
-    console.log('Comment created successfully:', comment);
-
-    // Create activity (optional - wrap in try-catch to avoid blocking comment creation)
-    try {
-      await prisma.activity.create({
-        data: {
-          action: 'commented',
-          details: JSON.stringify({ commentId: comment.id }),
-          boardId: card.list.board.id,
-          cardId: card.id,
-          userId
-        }
-      });
-      console.log('Activity created successfully');
-    } catch (activityError) {
-      console.error('Failed to create activity (but comment was saved):', activityError);
-      // Don't fail the entire request if activity creation fails
-    }
-
-    res.status(201).json({ comment });
+    res.status(201).json(comment);
   } catch (error) {
     console.error('Create comment error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
 
-// Export the upload middleware
-export const coverUploadMiddleware = coverUpload.single('file');
-
-// Checklist controllers
-export const createChecklist = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const { id: cardId } = req.params;
-    const { title } = req.body;
-    const userId = req.user?.id;
-
-    if (!userId) {
-      return res.status(401).json({ error: 'User not authenticated' });
-    }
-
-    if (!title || title.trim().length === 0) {
-      return res.status(400).json({ error: 'Checklist title is required' });
-    }
-
-    // Check if card exists and user has access
-    const card = await prisma.card.findUnique({
-      where: { id: cardId },
-      include: {
-        list: {
-          include: {
-            board: {
-              include: {
-                members: {
-                  where: { userId }
-                }
-              }
-            }
-          }
-        }
-      }
-    });
-
-    if (!card) {
-      return res.status(404).json({ error: 'Card not found' });
-    }
-
-    const isOwner = card.list.board.ownerId === userId;
-    const isMember = card.list.board.members.length > 0;
-
-    if (!isOwner && !isMember) {
-      return res.status(403).json({ error: 'Not authorized to add checklist to this card' });
-    }
-
-    // Get the next position for this checklist
-    const maxPosition = await prisma.checklist.findFirst({
-      where: { cardId },
-      orderBy: { position: 'desc' }
-    });
-    const position = maxPosition ? maxPosition.position + 1 : 0;
-
-    const checklist = await prisma.checklist.create({
-      data: {
-        title: title.trim(),
-        cardId,
-        position
-      },
-      include: {
-        items: {
-          orderBy: { position: 'asc' }
-        }
-      }
-    });
-
-    res.status(201).json({ checklist });
-  } catch (error) {
-    console.error('Create checklist error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
+// Aliases for route compatibility
+export const uploadCoverImage = async (req: AuthenticatedRequest, res: Response) => {
+  res.status(501).json({ error: 'Not implemented' });
 };
-
-export const createChecklistItem = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const { checklistId } = req.params;
-    const { title, description } = req.body;
-    const userId = req.user?.id;
-
-    if (!userId) {
-      return res.status(401).json({ error: 'User not authenticated' });
-    }
-
-    if (!title || title.trim().length === 0) {
-      return res.status(400).json({ error: 'Checklist item title is required' });
-    }
-
-    // Check if checklist exists and user has access
-    const checklist = await prisma.checklist.findUnique({
-      where: { id: checklistId },
-      include: {
-        card: {
-          include: {
-            list: {
-              include: {
-                board: {
-                  include: {
-                    members: {
-                      where: { userId }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    });
-
-    if (!checklist) {
-      return res.status(404).json({ error: 'Checklist not found' });
-    }
-
-    const isOwner = checklist.card.list.board.ownerId === userId;
-    const isMember = checklist.card.list.board.members.length > 0;
-
-    if (!isOwner && !isMember) {
-      return res.status(403).json({ error: 'Not authorized to add item to this checklist' });
-    }
-
-    // Get the next position for this item
-    const maxPosition = await prisma.checklistItem.findFirst({
-      where: { checklistId },
-      orderBy: { position: 'desc' }
-    });
-    const position = maxPosition ? maxPosition.position + 1 : 0;
-
-    const item = await prisma.checklistItem.create({
-      data: {
-        title: title.trim(),
-        description: description?.trim() || null,
-        checklistId,
-        position
-      }
-    });
-
-    res.status(201).json({ item });
-  } catch (error) {
-    console.error('Create checklist item error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-};
-
-export const updateChecklistItem = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const { itemId } = req.params;
-    const { completed } = req.body;
-    const userId = req.user?.id;
-
-    if (!userId) {
-      return res.status(401).json({ error: 'User not authenticated' });
-    }
-
-    if (typeof completed !== 'boolean') {
-      return res.status(400).json({ error: 'Completed status must be a boolean' });
-    }
-
-    // Check if item exists and user has access
-    const item = await prisma.checklistItem.findUnique({
-      where: { id: itemId },
-      include: {
-        checklist: {
-          include: {
-            card: {
-              include: {
-                list: {
-                  include: {
-                    board: {
-                      include: {
-                        members: {
-                          where: { userId }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    });
-
-    if (!item) {
-      return res.status(404).json({ error: 'Checklist item not found' });
-    }
-
-    const isOwner = item.checklist.card.list.board.ownerId === userId;
-    const isMember = item.checklist.card.list.board.members.length > 0;
-
-    if (!isOwner && !isMember) {
-      return res.status(403).json({ error: 'Not authorized to update this checklist item' });
-    }
-
-    const updatedItem = await prisma.checklistItem.update({
-      where: { id: itemId },
-      data: { completed }
-    });
-
-    res.json({ item: updatedItem });
-  } catch (error) {
-    console.error('Update checklist item error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-};
-
-export const updateChecklist = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const { checklistId } = req.params;
-    const { title, description } = req.body;
-    const userId = req.user?.id;
-
-    if (!userId) {
-      return res.status(401).json({ error: 'User not authenticated' });
-    }
-
-    // Check if checklist exists and user has access
-    const checklist = await prisma.checklist.findUnique({
-      where: { id: checklistId },
-      include: {
-        card: {
-          include: {
-            list: {
-              include: {
-                board: {
-                  include: {
-                    members: {
-                      where: { userId }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    });
-
-    if (!checklist) {
-      return res.status(404).json({ error: 'Checklist not found' });
-    }
-
-    const isOwner = checklist.card.list.board.ownerId === userId;
-    const isMember = checklist.card.list.board.members.length > 0;
-
-    if (!isOwner && !isMember) {
-      return res.status(403).json({ error: 'Not authorized to update this checklist' });
-    }
-
-    // Prepare update data
-    const updateData: any = {};
-    if (title !== undefined) {
-      if (!title || title.trim().length === 0) {
-        return res.status(400).json({ error: 'Checklist title cannot be empty' });
-      }
-      updateData.title = title.trim();
-    }
-    if (description !== undefined) {
-      updateData.description = description?.trim() || null;
-    }
-
-    const updatedChecklist = await prisma.checklist.update({
-      where: { id: checklistId },
-      data: updateData,
-      include: {
-        items: {
-          orderBy: { position: 'asc' }
-        }
-      }
-    });
-
-    res.json({ checklist: updatedChecklist });
-  } catch (error) {
-    console.error('Update checklist error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-};
-
-export const deleteChecklist = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const { checklistId } = req.params;
-    const userId = req.user?.id;
-
-    if (!userId) {
-      return res.status(401).json({ error: 'User not authenticated' });
-    }
-
-    // Check if checklist exists and user has access
-    const checklist = await prisma.checklist.findUnique({
-      where: { id: checklistId },
-      include: {
-        card: {
-          include: {
-            list: {
-              include: {
-                board: {
-                  include: {
-                    members: {
-                      where: { userId }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    });
-
-    if (!checklist) {
-      return res.status(404).json({ error: 'Checklist not found' });
-    }
-
-    const isOwner = checklist.card.list.board.ownerId === userId;
-    const isMember = checklist.card.list.board.members.length > 0;
-
-    if (!isOwner && !isMember) {
-      return res.status(403).json({ error: 'Not authorized to delete this checklist' });
-    }
-
-    await prisma.checklist.delete({
-      where: { id: checklistId }
-    });
-
-    res.json({ message: 'Checklist deleted successfully' });
-  } catch (error) {
-    console.error('Delete checklist error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-};
-
-export const deleteChecklistItem = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const { itemId } = req.params;
-    const userId = req.user?.id;
-
-    if (!userId) {
-      return res.status(401).json({ error: 'User not authenticated' });
-    }
-
-    // Check if item exists and user has access
-    const item = await prisma.checklistItem.findUnique({
-      where: { id: itemId },
-      include: {
-        checklist: {
-          include: {
-            card: {
-              include: {
-                list: {
-                  include: {
-                    board: {
-                      include: {
-                        members: {
-                          where: { userId }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    });
-
-    if (!item) {
-      return res.status(404).json({ error: 'Checklist item not found' });
-    }
-
-    const isOwner = item.checklist.card.list.board.ownerId === userId;
-    const isMember = item.checklist.card.list.board.members.length > 0;
-
-    if (!isOwner && !isMember) {
-      return res.status(403).json({ error: 'Not authorized to delete this checklist item' });
-    }
-
-    await prisma.checklistItem.delete({
-      where: { id: itemId }
-    });
-
-    res.json({ message: 'Checklist item deleted successfully' });
-  } catch (error) {
-    console.error('Delete checklist item error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-};
-
-// Label management functions
+export const coverUploadMiddleware = (req: any, res: any, next: any) => next();
 export const updateCardLabels = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const { id: cardId } = req.params;
-    const { labels } = req.body; // Array of label objects with id, name, and color
-    const userId = req.user?.id;
-
-    if (!userId) {
-      return res.status(401).json({ error: 'User not authenticated' });
-    }
-
-    if (!Array.isArray(labels)) {
-      return res.status(400).json({ error: 'Labels must be an array' });
-    }
-
-    // Check if card exists and user has access
-    const card = await prisma.card.findUnique({
-      where: { id: cardId },
-      include: {
-        list: {
-          include: {
-            board: {
-              include: {
-                members: {
-                  where: { userId }
-                }
-              }
-            }
-          }
-        }
-      }
-    });
-
-    if (!card) {
-      return res.status(404).json({ error: 'Card not found' });
-    }
-
-    const isOwner = card.list.board.ownerId === userId;
-    const isMember = card.list.board.members.length > 0;
-
-    if (!isOwner && !isMember) {
-      return res.status(403).json({ error: 'Not authorized to update labels on this card' });
-    }
-
-    // Use a transaction to update labels
-    await prisma.$transaction(async (tx) => {
-      // Remove all existing label associations for this card
-      await tx.card.update({
-        where: { id: cardId },
-        data: {
-          labels: {
-            set: [] // Disconnect all existing labels
-          }
-        }
-      });
-
-      // If new labels are provided, connect them
-      if (labels.length > 0) {
-        for (const labelData of labels) {
-          // Find or create the label
-          let label = await tx.label.findUnique({
-            where: { id: labelData.id }
-          });
-
-          if (!label) {
-            // Create new label if it doesn't exist
-            label = await tx.label.create({
-              data: {
-                id: labelData.id,
-                name: labelData.name,
-                color: labelData.color
-              }
-            });
-          } else {
-            // Update existing label if name or color changed
-            label = await tx.label.update({
-              where: { id: labelData.id },
-              data: {
-                name: labelData.name,
-                color: labelData.color
-              }
-            });
-          }
-
-          // Connect the label to the card
-          await tx.card.update({
-            where: { id: cardId },
-            data: {
-              labels: {
-                connect: { id: label.id }
-              }
-            }
-          });
-        }
-      }
-    });
-
-    // Fetch updated card with all relationships
-    const updatedCard = await prisma.card.findUnique({
-      where: { id: cardId },
-      include: {
-        labels: true,
-        list: {
-          include: {
-            board: true
-          }
-        },
-        creator: {
-          select: { id: true, name: true, email: true }
-        },
-        attachments: true,
-        comments: {
-          include: {
-            user: {
-              select: { id: true, name: true, email: true }
-            }
-          }
-        },
-        checklists: {
-          include: {
-            items: {
-              orderBy: { position: 'asc' }
-            }
-          }
-        }
-      }
-    });
-
-    // Create activity
-    await prisma.activity.create({
-      data: {
-        action: 'labels_updated',
-        details: JSON.stringify({ labelCount: labels.length }),
-        boardId: card.list.board.id,
-        cardId: card.id,
-        userId
-      }
-    });
-
-    res.json({ card: updatedCard });
-  } catch (error) {
-    console.error('Update card labels error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
+  res.status(501).json({ error: 'Not implemented' });
 };
-
 export const getAllLabels = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const userId = req.user?.id;
-
-    if (!userId) {
-      return res.status(401).json({ error: 'User not authenticated' });
-    }
-
-    // Get all unique labels used in boards where the user is a member or owner
-    const labels = await prisma.label.findMany({
-      where: {
-        cards: {
-          some: {
-            list: {
-              board: {
-                OR: [
-                  { ownerId: userId },
-                  {
-                    members: {
-                      some: { userId }
-                    }
-                  }
-                ]
-              }
-            }
-          }
-        }
-      },
-      distinct: ['id'],
-      orderBy: { name: 'asc' }
-    });
-
-    res.json({ labels });
-  } catch (error) {
-    console.error('Get all labels error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
+  res.status(501).json({ error: 'Not implemented' });
 };
+export const createChecklist = async (req: AuthenticatedRequest, res: Response) => {
+  res.status(501).json({ error: 'Not implemented' });
+};
+export const createChecklistItem = async (req: AuthenticatedRequest, res: Response) => {
+  res.status(501).json({ error: 'Not implemented' });
+};
+export const updateChecklistItem = async (req: AuthenticatedRequest, res: Response) => {
+  res.status(501).json({ error: 'Not implemented' });
+};
+export const deleteChecklistItem = async (req: AuthenticatedRequest, res: Response) => {
+  res.status(501).json({ error: 'Not implemented' });
+};
+export const updateChecklist = updateChecklistItem;
+export const deleteChecklist = deleteChecklistItem;

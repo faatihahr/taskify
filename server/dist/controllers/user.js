@@ -48,8 +48,40 @@ function handleLogin(req, res) {
             throw validationError;
         }
         const { email, password } = req.body;
-        const result = yield (0, auth_1.loginUser)(email, password);
-        res.json(Object.assign({ message: "Login success" }, result));
+        // Dev stub: if USE_STUB_LOGIN=true in env, return a fake user quickly
+        if (process.env.USE_STUB_LOGIN === 'true') {
+            console.log('handleLogin: using dev stub for', email);
+            return res.json({
+                message: 'Login success',
+                user_id: 'stub-user-id',
+                name: 'Developer',
+                email,
+                token: 'stub-token',
+                createdAt: new Date(),
+                updatedAt: new Date()
+            });
+        }
+        try {
+            const result = yield (0, auth_1.loginUser)(email, password);
+            res.json(Object.assign({ message: "Login success" }, result));
+        }
+        catch (err) {
+            console.error('handleLogin: error', err instanceof Error ? err.message : err);
+            // If DB or other error and stub allowed, fallback to stub
+            if (process.env.USE_STUB_LOGIN === 'true') {
+                console.log('handleLogin: falling back to dev stub after error for', email);
+                return res.json({
+                    message: 'Login success',
+                    user_id: 'stub-user-id',
+                    name: 'Developer',
+                    email,
+                    token: 'stub-token',
+                    createdAt: new Date(),
+                    updatedAt: new Date()
+                });
+            }
+            res.status(401).json({ message: err.message || 'Login failed' });
+        }
     });
 }
 function handleLogout(req, res) {

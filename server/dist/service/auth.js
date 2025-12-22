@@ -17,31 +17,24 @@ exports.loginUser = loginUser;
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const client_1 = require("../prisma/client");
 const jwt_1 = require("../utils/jwt");
-// REGISTER
-const registerUser = (name, email, password) => __awaiter(void 0, void 0, void 0, function* () {
-    // Validasi sederhana
-    if (!email.match(/@/) || password.length < 6) {
-        throw new Error("Invalid email or password");
-    }
-    // Cek apakah email sudah ada
-    const existingUser = yield client_1.prisma.user.findUnique({ where: { email } });
-    if (existingUser) {
-        throw new Error("Email already registered");
-    }
-    // Hash password
-    const hashed = yield bcryptjs_1.default.hash(password, 10);
-    // Buat user baru
-    const user = yield client_1.prisma.user.create({
-        data: {
-            name,
-            email,
-            password: hashed,
-        },
+function withTimeout(p, ms, message = 'Operation timed out') {
+    let timeout;
+    const t = new Promise((_, reject) => {
+        timeout = setTimeout(() => reject(new Error(message)), ms);
     });
-    // Buat JWT token
-    const payload = {
-        id: user.id,
-    };
+    return Promise.race([p, t]);
+}
+// REGISTER (kept simple)
+const registerUser = (name, email, password) => __awaiter(void 0, void 0, void 0, function* () {
+    if (!email.match(/@/) || password.length < 6) {
+        throw new Error('Invalid email or password');
+    }
+    const existingUser = yield withTimeout(client_1.prisma.user.findUnique({ where: { email } }), Number(process.env.DB_QUERY_TIMEOUT || 5000), 'DB lookup timed out');
+    if (existingUser)
+        throw new Error('Email already registered');
+    const hashed = yield bcryptjs_1.default.hash(password, 10);
+    const user = yield withTimeout(client_1.prisma.user.create({ data: { name, email, password: hashed } }), Number(process.env.DB_QUERY_TIMEOUT || 5000), 'DB create timed out');
+    const payload = { id: user.id };
     const token = (0, jwt_1.signToken)(payload);
     return {
         user_id: user.id,
@@ -49,30 +42,41 @@ const registerUser = (name, email, password) => __awaiter(void 0, void 0, void 0
         email: user.email,
         token,
         createdAt: user.createdAt,
-        updatedAt: user.updatedAt
+        updatedAt: user.updatedAt,
     };
 });
 exports.registerUser = registerUser;
-// LOGIN
+// LOGIN - simplified with timeout + logs
 function loginUser(email, password) {
     return __awaiter(this, void 0, void 0, function* () {
-        const user = yield client_1.prisma.user.findUnique({ where: { email } });
-        if (!user)
-            throw new Error("User not found");
-        if (!user.password)
-            throw new Error("Password not set for this user");
-        const isMatch = yield bcryptjs_1.default.compare(password, user.password);
-        if (!isMatch)
-            throw new Error("Incorrect password");
-        const payload = { id: user.id };
-        const token = (0, jwt_1.signToken)(payload);
-        return {
-            user_id: user.id,
-            name: user.name,
-            email: user.email,
-            token,
-            createdAt: user.createdAt,
-            updatedAt: user.updatedAt
-        };
+        console.log('loginUser: start for', email);
+        if (!process.env.DATABASE_URL) {
+            console.warn('loginUser: DATABASE_URL not set');
+        }
+        try {
+            const user = yield withTimeout(client_1.prisma.user.findUnique({ where: { email } }), Number(process.env.DB_QUERY_TIMEOUT || 5000), 'DB lookup timed out');
+            console.log('loginUser: user lookup done for', email);
+            if (!user)
+                throw new Error('User not found');
+            if (!user.password)
+                throw new Error('Password not set for this user');
+            const isMatch = yield withTimeout(bcryptjs_1.default.compare(password, user.password), 3000, 'bcrypt timed out');
+            if (!isMatch)
+                throw new Error('Incorrect password');
+            const payload = { id: user.id };
+            const token = (0, jwt_1.signToken)(payload);
+            return {
+                user_id: user.id,
+                name: user.name,
+                email: user.email,
+                token,
+                createdAt: user.createdAt,
+                updatedAt: user.updatedAt,
+            };
+        }
+        catch (err) {
+            console.error('loginUser: error for', email, err instanceof Error ? err.message : err);
+            throw err;
+        }
     });
 }

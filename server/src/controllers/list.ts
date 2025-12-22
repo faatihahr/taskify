@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
 import { prisma } from '../prisma/client';
+import { getUserBoardInfo } from '../utils/authHelpers';
+import { canPerformAction } from '../utils/permissions';
 
 // Extend Request type to include user
 interface AuthenticatedRequest extends Request {
@@ -34,18 +36,20 @@ export const createList = async (req: AuthenticatedRequest, res: Response) => {
       return res.status(404).json({ error: 'Board not found' });
     }
 
-    // Check if user is board member
-    const isMember = await prisma.boardMember.findUnique({
-      where: {
-        boardId_userId: {
-          boardId,
-          userId
-        }
-      }
-    });
-
-    if (!isMember && board.ownerId !== userId) {
+    // Get user board info and permissions
+    const boardInfo = await getUserBoardInfo(userId, boardId);
+    
+    if (!boardInfo || !boardInfo.hasAccess) {
       return res.status(403).json({ error: 'Not authorized to create list in this board' });
+    }
+
+    // Check if user can create list
+    if (!boardInfo.userRole && !boardInfo.isBoardOwner) {
+      return res.status(403).json({ error: 'No valid role found for this board' });
+    }
+    
+    if (!canPerformAction(boardInfo.userRole!, 'create_list', boardInfo.isBoardOwner)) {
+      return res.status(403).json({ error: 'Insufficient permissions to create list' });
     }
 
     // If position not provided, put it at the end

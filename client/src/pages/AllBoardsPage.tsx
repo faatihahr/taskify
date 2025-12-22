@@ -55,7 +55,7 @@ const AllBoardsPage: React.FC = () => {
     <div className="min-h-screen bg-background flex flex-col">
       <Header />
 
-      <main className="flex-1 p-3 sm:p-4 md:p-6 lg:p-8">
+      <main className="flex-1 relative z-10 mt-24 md:mt-28 p-3 sm:p-4 md:p-6 lg:p-8">
         <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
 
           {loading ? (

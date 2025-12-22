@@ -465,7 +465,7 @@ const BoardPage: React.FC = () => {
       </div>
 
       {/* Board Content */}
-      <div className="p-3 sm:p-6">
+      <div className="p-3 sm:p-6 overflow-x-auto">
         <DragDropContext onDragEnd={handleDragEnd}>
           <Droppable
             droppableId="lists"
@@ -498,7 +498,7 @@ const BoardPage: React.FC = () => {
                         >
                           <div
                             {...provided.dragHandleProps}
-                            className="px-3 sm:px-4 py-2 sm:py-3 border-b border-border/30 cursor-move"
+                            className="px-3 sm:px-4 py-2 sm:py-3 border-b border-border/30 cursor-move sticky top-0 bg-inherit z-10"
                           >
                             <div className="flex items-center justify-between">
                               <h3 className="font-semibold text-foreground text-sm sm:text-base truncate">

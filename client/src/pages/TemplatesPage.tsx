@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '../components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { ArrowLeft, Star, Users, Calendar, KanbanSquare, Layout } from 'lucide-react';
 import { useAppDispatch } from '../store/hooks';
 import { createBoard, createList, createCard } from '../store/boardsSlice';
@@ -158,7 +158,7 @@ const TemplatesPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pt-1 md:pt-2">
       {/* Header */}
       <div className="bg-card/80 backdrop-blur-md border-b border-border px-4 sm:px-6 py-3 sm:py-4 shadow-lg">
         <div className="flex items-center gap-4">

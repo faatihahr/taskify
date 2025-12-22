@@ -21,6 +21,11 @@ const port = process.env.PORT || 3000;
 // Basic middleware
 app.use(express_1.default.json());
 app.use(express_1.default.urlencoded({ extended: true }));
+// Request logger for debugging incoming requests
+app.use((req, res, next) => {
+    console.log(`Incoming request: ${req.method} ${req.originalUrl}`);
+    next();
+});
 // CORS
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
@@ -70,6 +75,9 @@ app.use('/api', list_1.default);
 // Import and use card routes
 const card_1 = __importDefault(require("./routes/card"));
 app.use('/api/cards', card_1.default);
+// Import and use invitation routes
+const invitation_1 = __importDefault(require("./routes/invitation"));
+app.use('/api/invitation', invitation_1.default);
 // Import and setup Swagger
 const swagger_1 = require("./swagger/swagger");
 app.use('/api-docs', swagger_1.swaggerUi.serve, swagger_1.swaggerUi.setup(swagger_1.swaggerSpec));
