@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import type { DropResult } from '@hello-pangea/dnd';
@@ -9,7 +9,9 @@ import { fetchBoardById, reorderCards, updateCardPosition, moveList, updateTaskC
 import CreateListModal from '../components/lists/CreateListModal';
 import CreateCardModal from '../components/cards/CreateCardModal';
 import TaskDetailModal from '../components/cards/TaskDetailModal';
+import TaskFilter from '../components/filters/TaskFilter';
 import { useNavigate } from 'react-router-dom';
+import { filterCards, getAllMembers, getAllLabels, type FilterOptions } from '../utils/filterUtils';
 
 // Color palette for lists with dark mode variants
 const listColors = [
@@ -46,6 +48,7 @@ const validateImageUrl = (imageUrl: string): string => {
   }
 };
 
+// Utility function to calculate optimal list height based on number of cards
 // Utility function to calculate optimal list height based on number of cards
 const calculateListHeight = (cardCount: number): string => {
   // Base measurements (in pixels)
@@ -153,47 +156,47 @@ const TaskCard: React.FC<{ task: any; index: number; onClick: () => void }> = ({
               {task.title}
             </h4>
 
-            {/* Priority indicator */}
-            <div className="flex items-center justify-between mt-2 sm:mt-3">
-              <div className="flex items-center gap-2 flex-wrap">
-                <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-primary rounded-full"></div>
-                
+            {/* Priority indicator and badges */}
+            <div className="flex flex-col gap-2 mt-2 sm:mt-3">
+              <div className="flex items-center gap-1 sm:gap-2">
+                <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-primary rounded-full flex-shrink-0"></div>
+
                 {/* Label Badges */}
                 {task.labels && task.labels.length > 0 && (
-                  <div className="flex items-center gap-1 flex-wrap">
-                    {task.labels.slice(0, 3).map((label: any) => (
+                  <div className="flex items-center gap-1 flex-wrap min-w-0 flex-1">
+                    {task.labels.slice(0, 2).map((label: any) => (
                       <div
                         key={label.id}
-                        className="px-1.5 py-0.5 rounded text-xs font-medium text-white"
+                        className="px-1 py-0.5 sm:px-1.5 sm:py-0.5 rounded text-xs font-medium text-white truncate max-w-16 sm:max-w-none"
                         style={{ backgroundColor: label.color }}
                         title={label.name}
                       >
-                        {label.name.length > 8 ? label.name.substring(0, 8) + '...' : label.name}
+                        {label.name.length > 6 ? label.name.substring(0, 6) + '...' : label.name}
                       </div>
                     ))}
-                    {task.labels.length > 3 && (
-                      <div className="px-1.5 py-0.5 rounded text-xs font-medium bg-gray-200 text-gray-600">
-                        +{task.labels.length - 3}
+                    {task.labels.length > 2 && (
+                      <div className="px-1 py-0.5 sm:px-1.5 sm:py-0.5 rounded text-xs font-medium bg-gray-200 text-gray-600 flex-shrink-0">
+                        +{task.labels.length - 2}
                       </div>
                     )}
                   </div>
                 )}
-                
-                {/* Checklist Badge */}
-                {checklistCompletion && (
-                  <div 
-                    className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                      checklistCompletion.isComplete 
-                        ? 'bg-green-100 text-green-700 border border-green-200' 
-                        : 'bg-gray-100 text-gray-600 border border-gray-200'
-                    }`}
-                    title={`${checklistCompletion.completedItems}/${checklistCompletion.totalItems} items completed`}
-                  >
-                    <CheckSquare className="h-3 w-3" />
-                    {checklistCompletion.percentage}%
-                  </div>
-                )}
               </div>
+
+              {/* Checklist Badge - separate row on mobile */}
+              {checklistCompletion && (
+                <div
+                  className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium w-fit ${
+                    checklistCompletion.isComplete
+                      ? 'bg-green-100 text-green-700 border border-green-200'
+                      : 'bg-gray-100 text-gray-600 border border-gray-200'
+                  }`}
+                  title={`${checklistCompletion.completedItems}/${checklistCompletion.totalItems} items completed`}
+                >
+                  <CheckSquare className="h-3 w-3" />
+                  {checklistCompletion.percentage}%
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -213,12 +216,42 @@ const BoardPage: React.FC = () => {
   const [selectedTask, setSelectedTask] = useState<any>(null);
   const [selectedListId, setSelectedListId] = useState<string | null>(null);
   const [taskUpdateCounter, setTaskUpdateCounter] = useState(0);
+  const [filters, setFilters] = useState<FilterOptions>({
+    search: '',
+    members: [],
+    labels: [],
+    dueDateFilter: null,
+    activityFilter: null,
+  });
 
   useEffect(() => {
     if (boardId) {
       dispatch(fetchBoardById(boardId));
     }
   }, [boardId, dispatch]);
+
+  // Get all members and labels from all cards
+  const allCards = useMemo(() => {
+    if (!currentBoard) return [];
+    return currentBoard.lists.flatMap(list => list.cards);
+  }, [currentBoard]);
+
+  const availableMembers = useMemo(() => getAllMembers(allCards), [allCards]);
+  const availableLabels = useMemo(() => getAllLabels(allCards), [allCards]);
+
+  // Get filtered lists with filtered cards
+  const filteredListsData = useMemo(() => {
+    if (!currentBoard) return [];
+    
+    return currentBoard.lists.map(list => ({
+      ...list,
+      cards: filterCards(list.cards, filters),
+    })); // Show all lists, even if empty
+  }, [currentBoard, filters]);
+
+  const handleFilterChange = (newFilters: FilterOptions) => {
+    setFilters(newFilters);
+  };
 
   const handleCreateList = () => {
     setShowCreateListModal(true);
@@ -430,7 +463,7 @@ const BoardPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-muted/20 to-background dark:from-background dark:via-muted/10 dark:to-background">
       {/* Board Header */}
-      <div className="bg-card/80 backdrop-blur-md border-b border-border px-4 sm:px-6 py-3 sm:py-4 shadow-lg">
+      <div className="bg-card/80 backdrop-blur-md border-b border-border px-4 sm:px-6 py-3 sm:py-4 shadow-lg overflow-visible relative z-10">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2 sm:gap-4">
             <Button
@@ -453,14 +486,21 @@ const BoardPage: React.FC = () => {
               )}
             </div>
           </div>
-          <Button
-            onClick={handleCreateList}
-            className="px-3 py-2 sm:px-4 shadow-md hover:shadow-lg w-full sm:w-auto"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            <span className="hidden sm:inline">Add List</span>
-            <span className="sm:hidden">Add</span>
-          </Button>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <TaskFilter
+              onFilterChange={handleFilterChange}
+              availableMembers={availableMembers}
+              availableLabels={availableLabels}
+            />
+            <Button
+              onClick={handleCreateList}
+              className="px-3 py-2 sm:px-4 shadow-md hover:shadow-lg flex-1 sm:flex-none"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">Add List</span>
+              <span className="sm:hidden">Add</span>
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -480,7 +520,7 @@ const BoardPage: React.FC = () => {
                   snapshot.isDraggingOver ? 'bg-primary/5' : ''
                 }`}
               >
-                {currentBoard.lists.map((list: any, index: number) => {
+                {filteredListsData.map((list: any, index: number) => {
                   return (
                     <Draggable key={list.id} draggableId={list.id} index={index}>
                       {(provided: any, snapshot: any) => (

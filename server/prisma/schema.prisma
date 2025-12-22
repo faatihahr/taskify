@@ -28,6 +28,7 @@ model User {
   activities    Activity[]
   attachments   Attachment[]
   invitationsSent Invitation[]
+  notifications   Notification[]
 
   @@map("users")
 }
@@ -47,6 +48,7 @@ model Board {
   members      BoardMember[]
   activities   Activity[]
   invitations  Invitation[]
+  notifications Notification[]
 
   @@map("boards")
 }
@@ -103,6 +105,7 @@ model Card {
   comments    Comment[]
   checklists  Checklist[]
   activities  Activity[]
+  notifications Notification[]
 
   @@map("cards")
 }
@@ -214,4 +217,25 @@ model Invitation {
   inviter   User   @relation(fields: [inviterId], references: [id], onDelete: Cascade)
 
   @@map("invitations")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  title     String
+  message   String
+  type      String   // task_assigned, task_due, board_shared, comment_added, etc.
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  // Related entities
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  boardId String?
+  board   Board? @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  cardId String?
+  card   Card? @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
 }

@@ -5,7 +5,7 @@ import { useAppDispatch, useAppSelector } from '../../store/hooks'
 import { logout } from '../../store/authSlice'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useTheme } from '../../contexts/ThemeContext'
-import DueDateNotification from '../notifications/DueDateNotification'
+import NotificationCenter from '../notifications/NotificationCenter'
 
 const Header: React.FC = () => {
   const { theme, toggleTheme } = useTheme()
@@ -19,7 +19,6 @@ const Header: React.FC = () => {
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
   const { user } = useAppSelector((state) => state.auth)
-  const { currentBoard } = useAppSelector((state) => state.boards)
 
   const handleLogout = () => {
     dispatch(logout())
@@ -81,8 +80,8 @@ const Header: React.FC = () => {
 
           {/* Desktop Actions */}
           <div className="hidden md:flex items-center space-x-3">
-            {/* Due Date Notifications - Only show when logged in and has board */}
-            {user && currentBoard && <DueDateNotification />}
+            {/* Notifications - Only show when logged in */}
+            {user && <NotificationCenter />}
             
             <Button
               variant="ghost"
@@ -124,8 +123,8 @@ const Header: React.FC = () => {
 
           {/* Mobile Menu Button */}
           <div className="flex md:hidden items-center space-x-2">
-            {/* Due Date Notifications - Only show when logged in and has board */}
-            {user && currentBoard && <DueDateNotification />}
+            {/* Notifications - Only show when logged in */}
+            {user && <NotificationCenter />}
             
             <Button
               variant="ghost"

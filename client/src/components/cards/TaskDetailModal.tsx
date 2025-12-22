@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useDispatch } from 'react-redux';
 import { useAppSelector } from '../../store/hooks';
-import { updateTaskDescription, createComment, createChecklist, updateCardLabels, updateTaskDueDate } from '../../store/boardsSlice';
+import { updateTaskDescription, createComment, createChecklist, updateCardLabels, updateTaskDueDate, deleteCard } from '../../store/boardsSlice';
 import type { AppDispatch } from '../../store';
 import { Button } from '../ui/button';
 import {
@@ -17,7 +17,8 @@ import {
   ChevronDown,
   Paperclip,
   Upload,
-  Search
+  Search,
+  Trash
 } from 'lucide-react';
 import RichTextEditor from '../RichTextEditor';
 import ChecklistComponent from '../checklist/Checklist';
@@ -74,6 +75,21 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
   const [currentLabels, setCurrentLabels] = useState(task?.labels || []);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [isMemberInviteModalOpen, setIsMemberInviteModalOpen] = useState(false);
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+
+  // Handle delete card
+  const handleDeleteCard = async () => {
+    if (!task?.id) return;
+    
+    if (confirm('Are you sure you want to delete this task?')) {
+      try {
+        await dispatch(deleteCard({ cardId: task.id }));
+        onClose();
+      } catch (error) {
+        console.error('Failed to delete card:', error);
+      }
+    }
+  };
 
   // Get comments directly from Redux store
   const comments = useMemo(() => {
@@ -197,12 +213,12 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
   if (!isOpen || !task) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="w-full max-w-6xl max-h-[90vh] bg-white dark:bg-gray-900 rounded-xl shadow-2xl flex overflow-hidden">
+    <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-3 sm:p-4">
+      <div className="w-full max-w-xl sm:max-w-4xl lg:max-w-6xl max-h-[90vh] bg-white dark:bg-gray-900 rounded-lg sm:rounded-xl shadow-2xl flex flex-col lg:flex-row overflow-hidden">
         {/* Main Content Area */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
           {/* Header */}
-          <div className="bg-gradient-to-r from-gray-800 to-gray-900 text-white p-6 relative overflow-hidden">
+          <div className="bg-gradient-to-r from-gray-800 to-gray-900 text-white p-6 sm:p-6 relative">
             {currentCoverImage && !coverImageError ? (
               <div
                 className="absolute inset-0 bg-cover bg-center opacity-30"
@@ -211,40 +227,62 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
                 }}
               ></div>
             ) : null}
-            <div className="absolute top-4 right-4 flex items-center gap-2">
-              <Button variant="ghost" size="sm" className="text-white hover:bg-white/20 cursor-pointer">
-                <Volume2 className="h-4 w-4" />
+            <div className="absolute top-2 sm:top-4 right-2 sm:right-4 flex items-center gap-1 sm:gap-2">
+              <Button variant="ghost" size="sm" className="text-white hover:bg-white/20 cursor-pointer h-8 w-8 sm:h-auto sm:w-auto p-1 sm:p-2">
+                <Volume2 className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
               <Button 
                 variant="ghost" 
                 size="sm" 
                 onClick={() => setIsCoverImageModalOpen(true)}
-                className="text-white hover:bg-white/20 cursor-pointer"
+                className="text-white hover:bg-white/20 cursor-pointer h-8 w-8 sm:h-auto sm:w-auto p-1 sm:p-2"
               >
-                <ImageIcon className="h-4 w-4" />
+                <ImageIcon className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
-              <Button variant="ghost" size="sm" className="text-white hover:bg-white/20 cursor-pointer">
-                <MoreVertical className="h-4 w-4" />
-              </Button>
+              <div className="relative">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)}
+                  className="text-white hover:bg-white/20 cursor-pointer h-8 w-8 sm:h-auto sm:w-auto p-1 sm:p-2"
+                >
+                  <MoreVertical className="h-3 w-3 sm:h-4 sm:w-4" />
+                </Button>
+                {isMoreMenuOpen && (
+                  <div className="absolute right-0 mt-1 sm:mt-2 w-40 sm:w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg z-50">
+                    <button
+                      onClick={() => {
+                        handleDeleteCard();
+                        setIsMoreMenuOpen(false);
+                      }}
+                      className="w-full px-3 sm:px-4 py-2 text-left text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2 rounded-lg hover:rounded-lg text-sm"
+                    >
+                      <Trash className="h-4 w-4 flex-shrink-0" />
+                      <span className="hidden sm:inline">Delete Task</span>
+                      <span className="sm:hidden">Delete</span>
+                    </button>
+                  </div>
+                )}
+              </div>
               <Button 
                 variant="ghost" 
                 size="sm" 
                 onClick={onClose}
-                className="text-white hover:bg-white/20 cursor-pointer"
+                className="text-white hover:bg-white/20 cursor-pointer h-8 w-8 sm:h-auto sm:w-auto p-1 sm:p-2"
               >
-                <X className="h-4 w-4" />
+                <X className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
             </div>
             
-            <div className="flex items-center gap-4 mb-4">
+            <div className="flex items-center gap-2 sm:gap-4 mb-3 sm:mb-4 pr-16 sm:pr-0">
               {/* Status Dropdown */}
-              <div className="flex items-center gap-2 bg-white/20 rounded-lg px-3 py-1.5 hover:bg-white/30 cursor-pointer transition-colors">
-                <span className="text-sm font-medium">{task.status || 'To Do'}</span>
+              <div className="flex items-center gap-1 sm:gap-2 bg-white/20 rounded-lg px-2 sm:px-3 py-1 sm:py-1.5 hover:bg-white/30 cursor-pointer transition-colors text-xs sm:text-sm">
+                <span className="font-medium">{task.status || 'To Do'}</span>
                 <ChevronDown className="h-3 w-3" />
               </div>
             </div>
 
-            <h1 className="text-2xl font-bold mb-2 flex items-center gap-3">
+            <h1 className="text-xl sm:text-2xl font-bold mb-3 flex items-center gap-3">
               {task.status === 'Done' && (
                 <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
                   <svg className="w-4 h-4 text-white" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
@@ -254,6 +292,57 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
               )}
               {task.title}
             </h1>
+
+            {/* Action Buttons - Moved right after title for better mobile visibility */}
+            <div className="flex flex-wrap items-center gap-1 sm:gap-2 mb-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  console.log('Labels button clicked!');
+                  setIsLabelPickerOpen(true);
+                }}
+                className="text-white hover:bg-white/20 border border-white/30 cursor-pointer transition-all duration-200 hover:scale-105 text-xs"
+                style={{ pointerEvents: 'auto', zIndex: 20, position: 'relative' }}
+              >
+                <Tag className="h-3 w-3 mr-1" />
+                <span className="sm:hidden">Lbl</span>
+                <span className="hidden sm:inline">Labels</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsDatePickerOpen(true)}
+                className="text-white hover:bg-white/20 border border-white/30 cursor-pointer transition-all duration-200 hover:scale-105 text-xs"
+                style={{ pointerEvents: 'auto', zIndex: 20, position: 'relative' }}
+              >
+                <Calendar className="h-3 w-3 mr-1" />
+                <span className="sm:hidden">Date</span>
+                <span className="hidden sm:inline">Dates</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowHeaderAddChecklist(true)}
+                className="text-white hover:bg-white/20 border border-white/30 cursor-pointer transition-all duration-200 hover:scale-105 text-xs"
+                style={{ pointerEvents: 'auto', zIndex: 20, position: 'relative' }}
+              >
+                <CheckSquare className="h-3 w-3 mr-1" />
+                <span className="sm:hidden">List</span>
+                <span className="hidden sm:inline">Checklist</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsMemberInviteModalOpen(true)}
+                className="text-white hover:bg-white/20 border border-white/30 cursor-pointer transition-all duration-200 hover:scale-105 text-xs"
+                style={{ pointerEvents: 'auto', zIndex: 20, position: 'relative' }}
+              >
+                <Users className="h-3 w-3 mr-1" />
+                <span className="sm:hidden">Mbr</span>
+                <span className="hidden sm:inline">Members</span>
+              </Button>
+            </div>
 
             {/* Current Labels Display */}
             {currentLabels.length > 0 && (
@@ -291,53 +380,6 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
                 </div>
               </div>
             )}
-
-            {/* Action Buttons */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => {
-                  console.log('Labels button clicked!');
-                  setIsLabelPickerOpen(true);
-                }}
-                className="text-white hover:bg-white/20 border border-white/30 cursor-pointer transition-all duration-200 hover:scale-105"
-                style={{ pointerEvents: 'auto', zIndex: 20, position: 'relative' }}
-              >
-                <Tag className="h-3 w-3 mr-1" />
-                Labels
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsDatePickerOpen(true)}
-                className="text-white hover:bg-white/20 border border-white/30 cursor-pointer transition-all duration-200 hover:scale-105"
-                style={{ pointerEvents: 'auto', zIndex: 20, position: 'relative' }}
-              >
-                <Calendar className="h-3 w-3 mr-1" />
-                Dates
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => setShowHeaderAddChecklist(true)}
-                className="text-white hover:bg-white/20 border border-white/30 cursor-pointer transition-all duration-200 hover:scale-105"
-                style={{ pointerEvents: 'auto', zIndex: 20, position: 'relative' }}
-              >
-                <CheckSquare className="h-3 w-3 mr-1" />
-                Checklist
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => setIsMemberInviteModalOpen(true)}
-                className="text-white hover:bg-white/20 border border-white/30 cursor-pointer transition-all duration-200 hover:scale-105"
-                style={{ pointerEvents: 'auto', zIndex: 20, position: 'relative' }}
-              >
-                <Users className="h-3 w-3 mr-1" />
-                Members
-              </Button>
-            </div>
           </div>
 
           {/* Header Checklist Input Modal */}
@@ -384,10 +426,10 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
           )}
 
           {/* Content */}
-          <div className="flex-1 overflow-y-auto p-6">
+          <div className="flex-1 overflow-y-auto p-3 sm:p-6">
             {/* Description Section */}
-            <div className="mb-8">
-              <div className="flex items-center justify-between mb-3">
+            <div className="mb-6 sm:mb-8">
+              <div className="flex items-center justify-between mb-2 sm:mb-3">
                 <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Description</h2>
                 {!isEditingDescription && (
                   <Button
@@ -472,11 +514,11 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
         </div>
 
         {/* Sidebar */}
-        <div className="w-80 border-l border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex flex-col">
+        <div className="hidden lg:flex lg:w-80 border-l border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex-col">
           {/* Comments and Activity Section */}
-          <div className="p-4 border-b border-gray-200">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-gray-800 dark:text-gray-100">Comments and activity</h3>
+          <div className="p-3 sm:p-4 border-b border-gray-200">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2">
+              <h3 className="font-semibold text-gray-800 dark:text-gray-100 text-sm sm:text-base">Comments and activity</h3>
               <Button
                 variant="ghost"
                 size="sm"

@@ -108,13 +108,15 @@ const ChecklistComponent: React.FC<ChecklistProps> = ({ cardId, checklists }) =>
         description
       })).unwrap();
       setEditingChecklistDescription(prev => ({ ...prev, [checklistId]: false }));
+      // Clear the local description state after successful update
+      setChecklistDescriptions(prev => ({ ...prev, [checklistId]: '' }));
     } catch (error) {
       console.error('Failed to update checklist description:', error);
     }
   };
 
-  const getChecklistProgress = (items: ChecklistItem[]) => {
-    if (items.length === 0) return 0;
+  const getChecklistProgress = (items: ChecklistItem[] | undefined) => {
+    if (!items || items.length === 0) return 0;
     const completed = items.filter(item => item.completed).length;
     return Math.round((completed / items.length) * 100);
   };

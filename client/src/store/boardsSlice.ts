@@ -114,7 +114,7 @@ export const createList = createAsyncThunk(
   'boards/createList',
   async ({ boardId, title }: { boardId: string; title: string }) => {
     const response = await api.post(`/api/boards/${boardId}/lists`, { title })
-    return response.data.list
+    return response.data
   }
 )
 
@@ -122,7 +122,7 @@ export const createCard = createAsyncThunk(
   'boards/createCard',
   async ({ listId, title, description, dueDate }: { listId: string; title: string; description?: string; dueDate?: string }) => {
     const response = await api.post(`/api/cards`, { title, description, dueDate, listId })
-    return response.data.card
+    return response.data
   }
 )
 
@@ -299,6 +299,14 @@ export const deleteChecklistItem = createAsyncThunk(
   }
 )
 
+export const deleteCard = createAsyncThunk(
+  'boards/deleteCard',
+  async ({ cardId }: { cardId: string }) => {
+    await api.delete(`/api/cards/${cardId}`)
+    return cardId;
+  }
+)
+
 export const updateCardLabels = createAsyncThunk(
   'boards/updateCardLabels',
   async ({ taskId, labels }: { taskId: string; labels: any[] }) => {
@@ -400,7 +408,9 @@ const boardsSlice = createSlice({
       // Create list
       .addCase(createList.fulfilled, (state, action) => {
         if (state.currentBoard) {
-          state.currentBoard.lists.push(action.payload)
+          // Server returns { list }, so we need to extract the list from payload
+          const newList = action.payload.list || action.payload;
+          state.currentBoard.lists.push(newList)
         }
       })
       .addCase(createList.rejected, (state, action) => {
@@ -518,7 +528,11 @@ const boardsSlice = createSlice({
           for (const list of state.currentBoard.lists) {
             const cardIndex = list.cards.findIndex(card => card.id === updatedCard.id);
             if (cardIndex !== -1) {
-              list.cards[cardIndex] = updatedCard;
+              // Merge the updated card with existing card to preserve other data like checklists
+              list.cards[cardIndex] = {
+                ...list.cards[cardIndex],
+                ...updatedCard
+              };
               console.log('Card updated in Redux store:', updatedCard);
               break;
             }
@@ -541,7 +555,11 @@ const boardsSlice = createSlice({
           for (const list of state.currentBoard.lists) {
             const cardIndex = list.cards.findIndex(card => card.id === updatedCard.id);
             if (cardIndex !== -1) {
-              list.cards[cardIndex] = updatedCard;
+              // Merge the updated card with existing card to preserve other data like checklists
+              list.cards[cardIndex] = {
+                ...list.cards[cardIndex],
+                ...updatedCard
+              };
               console.log('Card description updated in Redux store:', updatedCard);
               break;
             }
@@ -564,7 +582,11 @@ const boardsSlice = createSlice({
           for (const list of state.currentBoard.lists) {
             const cardIndex = list.cards.findIndex(card => card.id === updatedCard.id);
             if (cardIndex !== -1) {
-              list.cards[cardIndex] = updatedCard;
+              // Merge the updated card with existing card to preserve other data like checklists
+              list.cards[cardIndex] = {
+                ...list.cards[cardIndex],
+                ...updatedCard
+              };
               console.log('Card due date updated in Redux store:', updatedCard);
               break;
             }
@@ -724,8 +746,15 @@ const boardsSlice = createSlice({
             for (const card of list.cards) {
               const checklistIndex = card.checklists?.findIndex((checklist: any) => checklist.id === updatedChecklist.id);
               if (checklistIndex !== -1) {
-                card.checklists[checklistIndex] = updatedChecklist;
-                console.log('Checklist updated in Redux store:', updatedChecklist);
+                const existingChecklist = card.checklists[checklistIndex];
+                // Merge the updated checklist with existing checklist, preserving items if not in response
+                card.checklists[checklistIndex] = {
+                  ...existingChecklist,
+                  ...updatedChecklist,
+                  // Ensure items are preserved if they're not in the updated response
+                  items: updatedChecklist.items || existingChecklist.items
+                };
+                console.log('Checklist updated in Redux store:', card.checklists[checklistIndex]);
                 return;
               }
             }
@@ -764,6 +793,31 @@ const boardsSlice = createSlice({
       .addCase(deleteChecklistItem.rejected, (_, action) => {
         console.error('Failed to delete checklist item:', action.error.message);
       })
+      // Delete card
+      .addCase(deleteCard.fulfilled, (state, action) => {
+        console.log('deleteCard.fulfilled payload:', action.payload);
+        
+        if (state.currentBoard) {
+          const cardId = action.payload;
+          
+          // Find and remove the card from the list
+          for (const list of state.currentBoard.lists) {
+            const cardIndex = list.cards.findIndex(card => card.id === cardId);
+            if (cardIndex !== -1) {
+              list.cards.splice(cardIndex, 1);
+              // Update positions of remaining cards
+              for (let i = cardIndex; i < list.cards.length; i++) {
+                list.cards[i].position = i;
+              }
+              console.log('Card deleted from Redux store:', cardId);
+              break;
+            }
+          }
+        }
+      })
+      .addCase(deleteCard.rejected, (_, action) => {
+        console.error('Failed to delete card:', action.error.message);
+      })
       // Update card labels
       .addCase(updateCardLabels.fulfilled, (state, action) => {
         console.log('updateCardLabels.fulfilled payload:', action.payload);
@@ -775,7 +829,11 @@ const boardsSlice = createSlice({
           for (const list of state.currentBoard.lists) {
             const cardIndex = list.cards.findIndex(card => card.id === updatedCard.id);
             if (cardIndex !== -1) {
-              list.cards[cardIndex] = updatedCard;
+              // Merge the updated card with existing card to preserve other data like checklists
+              list.cards[cardIndex] = {
+                ...list.cards[cardIndex],
+                ...updatedCard
+              };
               console.log('Card labels updated in Redux store:', updatedCard);
               break;
             }

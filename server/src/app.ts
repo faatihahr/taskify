@@ -77,6 +77,10 @@ app.use('/api/cards', cardRoutes);
 import invitationRoutes from './routes/invitation';
 app.use('/api/invitation', invitationRoutes);
 
+// Import and use notification routes
+import notificationRoutes from './routes/notification';
+app.use('/api/notifications', notificationRoutes);
+
 // Import and setup Swagger
 import { swaggerUi, swaggerSpec } from './swagger/swagger';
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));

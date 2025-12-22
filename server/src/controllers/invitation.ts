@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { prisma } from '../prisma/client';
 import jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
+import { createMemberJoinedNotification } from '../services/notificationService';
 
 // Email transporter configuration (you'll need to set up actual email service)
 const transporter = nodemailer.createTransport({
@@ -230,6 +231,9 @@ export const acceptInvitation = async (req: Request, res: Response) => {
       },
     });
 
+    // Create notification for board owner
+    await createMemberJoinedNotification(board.ownerId, user.id, boardId);
+
     res.status(200).json({
       success: true,
       message: 'Invitation accepted successfully',
@@ -343,6 +347,9 @@ export const acceptInvitationById = async (req: Request, res: Response) => {
         status: 'ACCEPTED',
       },
     });
+
+    // Create notification for board owner
+    await createMemberJoinedNotification(invitation.board.ownerId, userId, invitation.boardId);
 
     res.status(200).json({
       success: true,
