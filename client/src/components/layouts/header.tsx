@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Button } from '../ui/button'
-import { Moon, Sun, Menu, X, LogOut, ChevronLeft } from 'lucide-react'
+import { Moon, Sun, Menu, X, LogOut, ChevronLeft, Layout } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '../../store/hooks'
 import { logout } from '../../store/authSlice'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
@@ -102,6 +102,12 @@ const Header: React.FC = () => {
               </>
             ) : (
               <div className="flex items-center space-x-2">
+                <Button asChild variant="ghost" className="flex items-center space-x-2">
+                  <Link to="/templates">
+                    <Layout className="h-4 w-4" />
+                    <span className="hidden sm:inline">Templates</span>
+                  </Link>
+                </Button>
                 <span className="text-sm font-medium">{user.name}</span>
                 <Button onClick={handleLogout} variant="ghost" className="flex items-center space-x-2">
                   <LogOut className="h-4 w-4" />
@@ -184,6 +190,14 @@ const Header: React.FC = () => {
                     <span className="font-medium">{user.name}</span>
                     <Button onClick={() => { setMobileMenuOpen(false); handleLogout(); }} className="ml-2" variant="ghost">
                       <LogOut className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="pt-4 border-t border-border/50">
+                    <Button asChild variant="outline" className="w-full justify-start" onClick={() => setMobileMenuOpen(false)}>
+                      <Link to="/templates" className="flex items-center space-x-2">
+                        <Layout className="h-4 w-4" />
+                        <span>Templates</span>
+                      </Link>
                     </Button>
                   </div>
                 </>

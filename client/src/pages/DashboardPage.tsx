@@ -13,6 +13,7 @@ import { fetchUserBoards } from '../store/boardsSlice';
 import { getPendingInvitations, acceptInvitationById } from '../store/invitationSlice';
 import { useNavigate } from 'react-router-dom';
 import CreateBoardModal from '../components/boards/CreateBoardModal';
+import CreateDropdown from '../components/boards/CreateDropdown';
 
 const DashboardPage: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -40,6 +41,10 @@ const DashboardPage: React.FC = () => {
     navigate('/boards/create');
   };
 
+  const handleStartWithTemplate = () => {
+    navigate('/templates');
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Header />
@@ -59,10 +64,10 @@ const DashboardPage: React.FC = () => {
                 })}
               </div>
             </div>
-            <Button onClick={handleCreateBoard} className="flex items-center gap-2">
-              <Plus className="h-4 w-4" />
-              Create New Board
-            </Button>
+            <CreateDropdown
+              onCreateBoard={handleCreateBoard}
+              onStartWithTemplate={handleStartWithTemplate}
+            />
           </div>
           
           <DashboardStats />

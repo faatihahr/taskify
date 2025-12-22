@@ -1,10 +1,19 @@
 import React from 'react'
+import { Navigate } from 'react-router-dom'
+import { useAppSelector } from '../store/hooks'
 import HeroSection from '../components/landing/HeroSection'
 import FeaturesSection from '../components/landing/FeaturesSection'
 import Header from '../components/layouts/header'
 import Footer from '../components/layouts/footer'
 
 const HomePage: React.FC = () => {
+  const { user } = useAppSelector((state) => state.auth)
+
+  // If user is logged in, redirect to dashboard
+  if (user) {
+    return <Navigate to="/dashboard" replace />
+  }
+
   return (
     <div className="bg-auth-gradient min-h-screen flex flex-col relative overflow-hidden">
       <Header />

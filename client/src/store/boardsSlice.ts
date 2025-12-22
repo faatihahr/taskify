@@ -144,18 +144,43 @@ export const updateCardPosition = createAsyncThunk(
   }
 )
 
+export const updateTaskCoverImageLocal = createAsyncThunk(
+  'boards/updateTaskCoverImageLocal',
+  async ({ taskId, coverImage }: { taskId: string; coverImage: string }) => {
+    // This action only updates the Redux store locally without calling the API
+    // Used when the image is already uploaded to the server via file upload
+    console.log('updateTaskCoverImageLocal called:', { taskId, coverImage });
+    
+    // Return the data in the same format as the API would
+    return {
+      id: taskId,
+      coverImage: coverImage
+    };
+  }
+)
+
 export const updateTaskCoverImage = createAsyncThunk(
   'boards/updateTaskCoverImage',
   async ({ taskId, coverImage }: { taskId: string; coverImage: string }) => {
-    const response = await api.put(`/api/cards/${taskId}`, { coverImage })
-    console.log('API response for updateTaskCoverImage:', response.data);
-    console.log('Response structure:', JSON.stringify(response.data, null, 2));
+    console.log('updateTaskCoverImage called:', { taskId, coverImage });
+    console.log('Cover image type:', coverImage.startsWith('data:') ? 'base64' : 'url');
+    console.log('Cover image length:', coverImage.length);
     
-    // The backend returns the updated card directly, not wrapped in response.data.card
-    if (response.data) {
-      return response.data;
-    } else {
-      throw new Error('No data returned from API');
+    try {
+      const response = await api.put(`/api/cards/${taskId}`, { coverImage })
+      console.log('API response for updateTaskCoverImage:', response.data);
+      console.log('Response structure:', JSON.stringify(response.data, null, 2));
+      
+      // The backend returns the updated card directly, not wrapped in response.data.card
+      if (response.data) {
+        console.log('Returning response data:', response.data);
+        return response.data;
+      } else {
+        throw new Error('No data returned from API');
+      }
+    } catch (error) {
+      console.error('Error in updateTaskCoverImage:', error);
+      throw error;
     }
   }
 )
@@ -458,6 +483,29 @@ const boardsSlice = createSlice({
       .addCase(updateCardPosition.rejected, (_, action) => {
         // Handle error - could show error notification
         console.error('Failed to update card position:', action.error.message);
+      })
+      // Update task cover image (local only)
+      .addCase(updateTaskCoverImageLocal.fulfilled, (state, action) => {
+        console.log('updateTaskCoverImageLocal.fulfilled payload:', action.payload);
+        
+        if (state.currentBoard && action.payload) {
+          const updatedCard = action.payload;
+          
+          // Find and update the card in the current board
+          for (const list of state.currentBoard.lists) {
+            const cardIndex = list.cards.findIndex(card => card.id === updatedCard.id);
+            if (cardIndex !== -1) {
+              list.cards[cardIndex].coverImage = updatedCard.coverImage;
+              console.log('Card coverImage updated locally in Redux store:', updatedCard);
+              break;
+            }
+          }
+        } else {
+          console.error('updateTaskCoverImageLocal: No payload or currentBoard');
+        }
+      })
+      .addCase(updateTaskCoverImageLocal.rejected, (_, action) => {
+        console.error('Failed to update task cover image locally:', action.error.message);
       })
       // Update task cover image
       .addCase(updateTaskCoverImage.fulfilled, (state, action) => {

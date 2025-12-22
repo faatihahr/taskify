@@ -212,7 +212,8 @@ const CreateCardModal: React.FC<CreateCardModalProps> = ({ isOpen, onClose, list
               />
             </div>
 
-            {/* Cover Image Section */}
+            {/* Cover Image Section - Hidden initially */}
+            {false && (
             <div className="space-y-2">
               <Label className="text-sm font-medium">Cover Image</Label>
               <div className="space-y-2">
@@ -260,8 +261,10 @@ const CreateCardModal: React.FC<CreateCardModalProps> = ({ isOpen, onClose, list
                 )}
               </div>
             </div>
+            )}
             
-            {/* Description Section */}
+            {/* Description Section - Hidden initially */}
+            {false && (
             <div className="space-y-2">
               <Label htmlFor="description" className="text-sm font-medium">
                 Description
@@ -275,8 +278,10 @@ const CreateCardModal: React.FC<CreateCardModalProps> = ({ isOpen, onClose, list
                 disabled={isLoading}
               />
             </div>
+            )}
 
-            {/* Quick Actions Bar */}
+            {/* Quick Actions Bar - Hidden initially */}
+            {false && (
             <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
               <div className="flex items-center gap-1">
                 {/* Due Date */}
@@ -356,8 +361,10 @@ const CreateCardModal: React.FC<CreateCardModalProps> = ({ isOpen, onClose, list
                 </div>
               </div>
             </div>
+            )}
 
-            {/* Advanced Options */}
+            {/* Advanced Options - Hidden initially */}
+            {false && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-gray-700">Advanced Options</span>
@@ -454,6 +461,7 @@ const CreateCardModal: React.FC<CreateCardModalProps> = ({ isOpen, onClose, list
                 </div>
               )}
             </div>
+            )}
 
             {/* Action Buttons */}
             <div className="flex gap-2 pt-4 border-t">

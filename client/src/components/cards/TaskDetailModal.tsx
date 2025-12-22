@@ -23,6 +23,7 @@ import RichTextEditor from '../RichTextEditor';
 import ChecklistComponent from '../checklist/Checklist';
 import LabelPicker from '../labels/LabelPicker';
 import MemberInviteModal from '../members/MemberInviteModal';
+import api from '../../lib/api';
 
 // Utility function to validate and format image URLs
 const validateImageUrl = (imageUrl: string): string => {
@@ -32,14 +33,14 @@ const validateImageUrl = (imageUrl: string): string => {
     // Blob URLs are temporary and may expire
     // We'll try to use them but they might fail
     return imageUrl;
+  } else if (imageUrl.startsWith('data:')) {
+    // Base64 images should be used as-is
+    return imageUrl;
   } else if (imageUrl.startsWith('/uploads')) {
     // Server uploaded images need full URL
     return `http://localhost:3000${imageUrl}`;
   } else if (imageUrl.startsWith('http')) {
     // Full URLs should be used as-is
-    return imageUrl;
-  } else if (imageUrl.startsWith('data:')) {
-    // Base64 images should be used as-is
     return imageUrl;
   } else {
     // Fallback for any other format
@@ -563,6 +564,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ isOpen, onClose, task
         isOpen={isCoverImageModalOpen}
         onClose={() => setIsCoverImageModalOpen(false)}
         onCoverImageUpdate={handleCoverImageUpdate}
+        taskId={task.id}
       />
 
       {/* Label Picker Modal */}
@@ -723,11 +725,14 @@ const DatePickerModal: React.FC<{
 const CoverImageModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
-  onCoverImageUpdate: (imageUrl: string) => void;
-}> = ({ isOpen, onClose, onCoverImageUpdate }) => {
+  onCoverImageUpdate: (imageUrl: string, alreadyUploaded?: boolean) => void;
+  taskId: string;
+}> = ({ isOpen, onClose, onCoverImageUpdate, taskId }) => {
   const [activeTab, setActiveTab] = useState<'upload' | 'unsplash'>('upload');
   const [selectedImage, setSelectedImage] = useState<string>('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const [unsplashImages] = useState([
     'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=400&fit=crop',
     'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=800&h=400&fit=crop',
@@ -740,7 +745,15 @@ const CoverImageModal: React.FC<{
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && file.type.startsWith('image/')) {
-      // Convert image to base64 for persistence
+      // Check file size
+      if (file.size > 5 * 1024 * 1024) {
+        alert('File size too large. Please select an image smaller than 5MB.');
+        return;
+      }
+
+      setSelectedFile(file);
+      
+      // Convert to base64 for preview only
       const reader = new FileReader();
       reader.onloadend = () => {
         const base64String = reader.result as string;
@@ -754,34 +767,84 @@ const CoverImageModal: React.FC<{
     fileInputRef.current?.click();
   };
 
-  const handleSaveCover = () => {
-    if (selectedImage) {
-      onCoverImageUpdate(selectedImage);
+  const uploadCoverImageToServer = async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await api.post(`/api/cards/${taskId}/cover`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
+      console.log('Cover image uploaded successfully:', response.data);
+      console.log('Response structure:', JSON.stringify(response.data, null, 2));
+      
+      // The upload endpoint should return the updated card with the new coverImage
+      if (response.data && response.data.card) {
+        return response.data.card.coverImage;
+      } else if (response.data && response.data.coverImage) {
+        return response.data.coverImage;
+      } else {
+        throw new Error('Invalid response format from upload endpoint');
+      }
+    } catch (error) {
+      console.error('Failed to upload cover image:', error);
+      throw error;
+    }
+  };
+
+  const handleSaveCover = async () => {
+    if (!selectedImage) return;
+
+    setIsUploading(true);
+    try {
+      let coverImageUrl = selectedImage;
+
+      // If we have a file (from device upload), upload it to server
+      if (selectedFile && activeTab === 'upload') {
+        coverImageUrl = await uploadCoverImageToServer(selectedFile);
+        
+        // For device uploads, the file upload endpoint already updated the database
+        // We need to update the Redux store directly without calling the API again
+        // Let's use the parent callback but with a flag to indicate it's already uploaded
+        onCoverImageUpdate(coverImageUrl, true); // true = already uploaded to server
+      } else {
+        // For Unsplash images, use the existing update mechanism
+        onCoverImageUpdate(coverImageUrl, false); // false = needs to be uploaded
+      }
+
       onClose();
+    } catch (error) {
+      console.error('Failed to save cover image:', error);
+      alert('Failed to upload cover image. Please try again.');
+    } finally {
+      setIsUploading(false);
     }
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="w-full max-w-4xl max-h-[85vh] bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col">
+    <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4">
+      <div className="w-full max-w-4xl max-h-[85vh] bg-white dark:bg-gray-900 rounded-xl shadow-2xl overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="bg-gray-50 border-b border-gray-200 p-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-800">Change Cover</h2>
+        <div className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Change Cover</h2>
           <Button variant="ghost" size="sm" onClick={onClose}>
             <X className="h-4 w-4" />
           </Button>
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-gray-200">
+        <div className="flex border-b border-gray-200 dark:border-gray-700">
           <button
             onClick={() => setActiveTab('upload')}
             className={`flex-1 py-3 px-4 text-sm font-medium ${
               activeTab === 'upload'
                 ? 'border-b-2 border-blue-500 text-blue-600'
-                : 'text-gray-600 hover:text-gray-800'
+                : 'text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'
             }`}
           >
             <Upload className="h-4 w-4 inline mr-2" />
@@ -792,7 +855,7 @@ const CoverImageModal: React.FC<{
             className={`flex-1 py-3 px-4 text-sm font-medium ${
               activeTab === 'unsplash'
                 ? 'border-b-2 border-blue-500 text-blue-600'
-                : 'text-gray-600 hover:text-gray-800'
+                : 'text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'
             }`}
           >
             <Search className="h-4 w-4 inline mr-2" />
@@ -804,7 +867,7 @@ const CoverImageModal: React.FC<{
         <div className="flex-1 overflow-y-auto p-6">
           {activeTab === 'upload' ? (
             <div className="space-y-4">
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+              <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center">
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -821,14 +884,14 @@ const CoverImageModal: React.FC<{
                   <Upload className="h-4 w-4 mr-2" />
                   Choose Image
                 </Button>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-gray-500 dark:text-gray-400">
                   JPEG, PNG, GIF, WebP (max 5MB)
                 </p>
               </div>
 
               {selectedImage && (
                 <div className="space-y-4">
-                  <h3 className="text-sm font-medium text-gray-700">Preview</h3>
+                  <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">Preview</h3>
                   <img
                     src={selectedImage}
                     alt="Cover preview"
@@ -847,7 +910,7 @@ const CoverImageModal: React.FC<{
                     className={`cursor-pointer rounded-lg overflow-hidden border-2 transition-all ${
                       selectedImage === image
                         ? 'border-blue-500 ring-2 ring-blue-200'
-                        : 'border-gray-200 hover:border-gray-300'
+                        : 'border-gray-200 hover:border-gray-300 dark:border-gray-600 dark:hover:border-gray-500'
                     }`}
                   >
                     <img
@@ -861,7 +924,7 @@ const CoverImageModal: React.FC<{
 
               {selectedImage && (
                 <div className="space-y-4">
-                  <h3 className="text-sm font-medium text-gray-700">Preview</h3>
+                  <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">Preview</h3>
                   <img
                     src={selectedImage}
                     alt="Cover preview"
@@ -874,16 +937,23 @@ const CoverImageModal: React.FC<{
         </div>
 
         {/* Footer */}
-        <div className="bg-gray-50 border-t border-gray-200 p-4 flex justify-between flex-shrink-0">
+        <div className="bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4 flex justify-between flex-shrink-0">
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
           <Button
             onClick={handleSaveCover}
-            disabled={!selectedImage}
+            disabled={!selectedImage || isUploading}
             className="bg-blue-600 hover:bg-blue-700"
           >
-            Save Cover
+            {isUploading ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Uploading...
+              </>
+            ) : (
+              'Save Cover'
+            )}
           </Button>
         </div>
       </div>

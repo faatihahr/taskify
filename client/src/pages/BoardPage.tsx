@@ -5,7 +5,7 @@ import type { DropResult } from '@hello-pangea/dnd';
 import { Button } from '../components/ui/button';
 import { Plus, ChevronLeft, Image as ImageIcon, CheckSquare } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { fetchBoardById, reorderCards, updateCardPosition, moveList, updateTaskCoverImage } from '../store/boardsSlice';
+import { fetchBoardById, reorderCards, updateCardPosition, moveList, updateTaskCoverImage, updateTaskCoverImageLocal } from '../store/boardsSlice';
 import CreateListModal from '../components/lists/CreateListModal';
 import CreateCardModal from '../components/cards/CreateCardModal';
 import TaskDetailModal from '../components/cards/TaskDetailModal';
@@ -26,10 +26,13 @@ const listColors = [
 // Utility function to validate and format image URLs
 const validateImageUrl = (imageUrl: string): string => {
   if (!imageUrl) return '';
-  
+
   if (imageUrl.startsWith('blob:')) {
     // Blob URLs are temporary and may expire
     // We'll try to use them but they might fail
+    return imageUrl;
+  } else if (imageUrl.startsWith('data:')) {
+    // Base64 images should be used as-is
     return imageUrl;
   } else if (imageUrl.startsWith('/uploads')) {
     // Server uploaded images need full URL
@@ -37,17 +40,52 @@ const validateImageUrl = (imageUrl: string): string => {
   } else if (imageUrl.startsWith('http')) {
     // Full URLs should be used as-is
     return imageUrl;
-  } else if (imageUrl.startsWith('data:')) {
-    // Base64 images should be used as-is
-    return imageUrl;
   } else {
     // Fallback for any other format
     return imageUrl;
   }
 };
 
+// Utility function to calculate optimal list height based on number of cards
+const calculateListHeight = (cardCount: number): string => {
+  // Base measurements (in pixels)
+  const headerHeight = 56; // Header with title and badge
+  const paddingTop = 12; // p-3 = 12px
+  const paddingBottom = 12; // p-3 = 12px
+  const buttonHeight = 36; // Add task button
+  const buttonMargin = 8; // mt-2 = 8px
+  const cardSpacing = 8; // space-y-2 = 8px between cards
+
+  // Average card height (varies based on content)
+  const averageCardHeight = 140; // Base card height
+
+  if (cardCount === 0) {
+    // Empty list: header + padding + button
+    return `${headerHeight + paddingTop + 60 + buttonHeight + buttonMargin + paddingBottom}px`;
+  }
+
+  // Calculate total content height
+  const cardsHeight = (cardCount * averageCardHeight) + ((cardCount - 1) * cardSpacing);
+  const totalContentHeight = headerHeight + paddingTop + cardsHeight + buttonHeight + buttonMargin + paddingBottom;
+
+  // For small lists, show all content
+  if (cardCount <= 4) {
+    return `${Math.max(200, totalContentHeight)}px`; // Minimum 200px
+  }
+  // For medium lists, show all but with reasonable max
+  else if (cardCount <= 6) {
+    return `${Math.min(600, totalContentHeight)}px`; // Max 600px for medium lists
+  }
+  // For large lists, use max height with scroll
+  else {
+    return '550px'; // Max height with internal scroll
+  }
+};
+
 const TaskCard: React.FC<{ task: any; index: number; onClick: () => void }> = ({ task, index, onClick }) => {
   console.log('TaskCard rendered:', { taskId: task.id, taskTitle: task.title, index });
+  console.log('Task cover image:', task.coverImage);
+  console.log('Cover image type:', task.coverImage ? (task.coverImage.startsWith('data:') ? 'base64' : 'url') : 'none');
   const [imageError, setImageError] = useState(false);
   
   // Calculate checklist completion
@@ -196,19 +234,38 @@ const BoardPage: React.FC = () => {
     setShowTaskDetailModal(true);
   };
 
-  const handleCoverImageUpdate = async (taskId: string, newCoverImage: string) => {
-    console.log('handleCoverImageUpdate in BoardPage:', { taskId, newCoverImage });
+  const handleCoverImageUpdate = async (taskId: string, newCoverImage: string, alreadyUploaded: boolean = false) => {
+    console.log('handleCoverImageUpdate in BoardPage:', { taskId, newCoverImage, alreadyUploaded });
+    console.log('Cover image type:', newCoverImage.startsWith('data:') ? 'base64' : 'url');
+    console.log('Cover image length:', newCoverImage.length);
 
     try {
-      // Dispatch action to update task cover image in Redux store
-      await dispatch(updateTaskCoverImage({ taskId, coverImage: newCoverImage })).unwrap();
-      console.log('Task cover image updated successfully in Redux store');
+      if (alreadyUploaded) {
+        // For device uploads, the image is already uploaded to the server
+        // Just update the Redux store locally without calling the API
+        console.log('Image already uploaded, updating Redux store locally');
+        
+        // Update Redux store locally
+        await dispatch(updateTaskCoverImageLocal({ taskId, coverImage: newCoverImage })).unwrap();
+        console.log('Task cover image updated locally in Redux store');
+        
+        // Update selectedTask for immediate UI update
+        if (selectedTask && selectedTask.id === taskId) {
+          const updatedTask = { ...selectedTask, coverImage: newCoverImage };
+          setSelectedTask(updatedTask);
+          console.log('selectedTask updated:', updatedTask);
+        }
+      } else {
+        // For Unsplash images, dispatch action to update task cover image in Redux store
+        await dispatch(updateTaskCoverImage({ taskId, coverImage: newCoverImage })).unwrap();
+        console.log('Task cover image updated successfully in Redux store');
 
-      // Update selectedTask for immediate UI update
-      if (selectedTask && selectedTask.id === taskId) {
-        const updatedTask = { ...selectedTask, coverImage: newCoverImage };
-        setSelectedTask(updatedTask);
-        console.log('selectedTask updated:', updatedTask);
+        // Update selectedTask for immediate UI update
+        if (selectedTask && selectedTask.id === taskId) {
+          const updatedTask = { ...selectedTask, coverImage: newCoverImage };
+          setSelectedTask(updatedTask);
+          console.log('selectedTask updated:', updatedTask);
+        }
       }
     } catch (error) {
       console.error('Failed to update task cover image:', error);
@@ -281,24 +338,20 @@ const BoardPage: React.FC = () => {
     if (type === 'COLUMN') {
       console.log('=== HANDLING LIST REORDER ===');
       console.log('Move list data:', { listId: draggableId, position: destination.index });
-      
+
       try {
         const result = await dispatch(moveList({
           listId: draggableId,
           position: destination.index
         })).unwrap();
         console.log('Move list successful:', result);
-        
-        // Refetch to ensure state is updated
-        if (boardId) {
-          dispatch(fetchBoardById(boardId));
-        }
+
+        // Removed automatic refetch for smoother UX
+        // State is already updated via optimistic update
       } catch (error) {
         console.error('Failed to move list:', error);
-        // Refetch board data on error
-        if (boardId) {
-          dispatch(fetchBoardById(boardId));
-        }
+        // Could add user notification here instead of refetch
+        // For now, optimistic update remains (user sees intended position)
       }
       return;
     }
@@ -332,14 +385,9 @@ const BoardPage: React.FC = () => {
         position: destination.index,
       })).unwrap();
       console.log('Card position updated successfully');
-      
-      // Don't refetch immediately - let the optimistic update handle UI
-      // Only refetch if there's an error or after a delay
-      setTimeout(() => {
-        if (boardId) {
-          dispatch(fetchBoardById(boardId));
-        }
-      }, 1000);
+
+      // Removed automatic refetch for smoother UX
+      // State is already updated via optimistic update
     } catch (error) {
       console.error('Failed to update card position:', error);
       // Refetch on error to restore correct state
@@ -432,66 +480,79 @@ const BoardPage: React.FC = () => {
                   snapshot.isDraggingOver ? 'bg-primary/5' : ''
                 }`}
               >
-                {currentBoard.lists.map((list: any, index: number) => (
-                  <Draggable key={list.id} draggableId={list.id} index={index}>
-                    {(provided: any, snapshot: any) => (
-                      <div
-                        ref={provided.innerRef}
-                        {...provided.draggableProps}
-                        className={`w-64 sm:w-72 ${list.color || listColors[index % listColors.length]} rounded-lg flex-shrink-0 border-2 shadow-md transition-shadow ${
-                          snapshot.isDragging ? 'shadow-2xl' : ''
-                        }`}
-                        style={{
-                          ...provided.draggableProps.style,
-                        }}
-                      >
+                {currentBoard.lists.map((list: any, index: number) => {
+                  return (
+                    <Draggable key={list.id} draggableId={list.id} index={index}>
+                      {(provided: any, snapshot: any) => (
                         <div
-                          {...provided.dragHandleProps}
-                          className="px-3 sm:px-4 py-2 sm:py-3 border-b border-border/30 cursor-move"
+                          ref={provided.innerRef}
+                          {...provided.draggableProps}
+                          className={`w-64 sm:w-72 ${list.color || listColors[index % listColors.length]} rounded-lg flex-shrink-0 border-2 shadow-md transition-shadow flex flex-col ${
+                            snapshot.isDragging ? 'shadow-2xl' : ''
+                          }`}
+                          style={{
+                            ...provided.draggableProps.style,
+                            minHeight: '120px', // Ensure minimum height for header
+                            maxHeight: 'calc(100vh - 200px)' // Prevent lists from becoming too tall
+                          }}
                         >
-                          <div className="flex items-center justify-between">
-                            <h3 className="font-semibold text-foreground text-sm sm:text-base truncate">
-                              {list.title}
-                            </h3>
-                            <span className="text-xs sm:text-sm font-bold text-foreground bg-background/60 px-2 py-1 rounded-full shadow-sm flex-shrink-0">
-                              {list.cards?.length || 0}
-                            </span>
+                          <div
+                            {...provided.dragHandleProps}
+                            className="px-3 sm:px-4 py-2 sm:py-3 border-b border-border/30 cursor-move"
+                          >
+                            <div className="flex items-center justify-between">
+                              <h3 className="font-semibold text-foreground text-sm sm:text-base truncate">
+                                {list.title}
+                              </h3>
+                              <span className="text-xs sm:text-sm font-bold text-foreground bg-background/60 px-2 py-1 rounded-full shadow-sm flex-shrink-0">
+                                {list.cards?.length || 0}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="p-2 sm:p-3 flex-1 overflow-hidden">
+                            <Droppable droppableId={list.id} type="CARD">
+                              {(provided: any) => (
+                                <div
+                                  {...provided.droppableProps}
+                                  ref={provided.innerRef}
+                                  className="h-full overflow-y-auto"
+                                  style={{
+                                    minHeight: '60px',
+                                    maxHeight: 'calc(100vh - 350px)'
+                                  }}
+                                >
+                                  {list.cards.map((task: any, taskIndex: number) => (
+                                    <div key={task.id} className="mb-2 last:mb-0">
+                                      <TaskCard
+                                        task={task}
+                                        index={taskIndex}
+                                        onClick={() => handleTaskClick(task)}
+                                      />
+                                    </div>
+                                  ))}
+                                  {provided.placeholder}
+                                </div>
+                              )}
+                            </Droppable>
+                          </div>
+
+                          <div className="p-2 sm:p-3 pt-0 flex-shrink-0">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleAddTask(list.id)}
+                              className="w-full justify-start text-xs sm:text-sm py-1 sm:py-2"
+                            >
+                              <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                              Add task
+                            </Button>
                           </div>
                         </div>
-                        <div className="p-2 sm:p-3">
-                          <Droppable droppableId={list.id} type="CARD">
-                            {(provided: any) => (
-                              <div
-                                {...provided.droppableProps}
-                                ref={provided.innerRef}
-                                className="space-y-1 sm:space-y-2 min-h-[200px] sm:min-h-[300px]"
-                              >
-                                {list.cards.map((task: any, taskIndex: number) => (
-                                  <TaskCard
-                                    key={task.id}
-                                    task={task}
-                                    index={taskIndex}
-                                    onClick={() => handleTaskClick(task)}
-                                  />
-                                ))}
-                                {provided.placeholder}
-                              </div>
-                            )}
-                          </Droppable>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleAddTask(list.id)}
-                            className="w-full justify-start mt-1 sm:mt-2 text-xs sm:text-sm py-1 sm:py-2"
-                          >
-                            <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                            Add task
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </Draggable>
-                ))}
+                      )}
+                    </Draggable>
+                  );
+                })}
                 {provided.placeholder}
               </div>
             )}
